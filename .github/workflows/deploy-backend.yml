@@ -60,12 +60,17 @@ jobs:
             IMAGE_TAG="${{ needs.build-and-push.outputs.image_tag }}"
             cd /root/ink-and-memory/backend
             mkdir -p /root/ink-and-memory/backend/data
+            # Write models.json from secret for runtime mounting
+            cat > /root/ink-and-memory/backend/models.json <<'EOF'
+${{ secrets.MODELS_JSON }}
+EOF
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u shuxueshuxue --password-stdin >/dev/null
             docker pull "${IMAGE_TAG}"
             docker rm -f ink-backend || true
             docker run -d --name ink-backend --restart unless-stopped \
               -p 127.0.0.1:8765:8765 \
               -v /root/ink-and-memory/backend/data:/app/data \
+              -v /root/ink-and-memory/backend/models.json:/app/models.json:ro \
               -e BACKEND_VERSION=${IMAGE_TAG} \
               ${IMAGE_TAG}
             tmux kill-session -t ink-and-memory-docker 2>/dev/null || true
