@@ -95,7 +95,7 @@ export default function AboutView() {
                 marginBottom: 4,
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}>
-                Lexical Mathical
+                F2J
               </div>
               <div style={{
                 fontSize: 14,
