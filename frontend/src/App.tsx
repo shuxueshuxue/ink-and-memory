@@ -1,4 +1,23 @@
-// App.tsx
+// [Input] Consume React hooks, editor engine modules, app views/components, auth/session hooks, storage utilities, and API helpers.
+// [Output] Render the authenticated Ink & Memory app shell and route current view state.
+// [Pos] frontend app-root node in frontend/src
+// [Sync] 2026-05-25: remove ChatView settings-navigation prop after left chat nav Settings button deletion.
+// [Sync] 2026-05-29: pass state as editorState prop to ChatView so agent receives current EditorState snapshot.
+// [Sync] 2026-05-29: add handleEditorWriteConfirmed callback; reloads session from DB after agent MCP write tool approved.
+// [Sync] 2026-05-29: keep ChatView mounted after first open so chat state survives app view switches.
+// [Sync] 2026-05-29: listen for editor:jump-to-cell custom event; switch to writing view and scroll+focus target textarea.
+// [Sync] 2026-06-14: replace 2s MCP write blind wait with Edit Session SSE event sync plus timeout fallback.
+// [Sync] 2026-05-30: fix handleAgentSelect to focus text cell after inserted widget; fixes "cannot insert cells after widget" bug.
+// [Sync] 2026-05-30: restore inline Deck chat — handleAgentSelect inserts widget, stays in writing view; handleChatSend uses chatWithVoice with full context (allText, metaPrompt, statePrompt); "Chat →" button available when thread exists.
+// [Sync] 2026-06-01: pass state as editorState to chatWithVoiceSSE in handleChatSend so inline widget agent receives editor_state.
+// [Sync] 2026-06-01: pass current user_session.labels into StateChooser for writing-session metadata display.
+// [Sync] 2026-05-29: fix bottom stats bar background from hardcoded #fafafa to var(--color-bg-paper) to match writing area.
+// [Sync] 2026-06-23: route /oauth/device/verify to the Device Flow verification page before the main app shell.
+// [Sync] 2026-07-04: add Resource Connector view entry and mobile/desktop navigation affordance.
+// [Sync] 2026-07-05: make the connector viewport scrollable inside the fixed app shell so resource selection and source cards remain reachable.
+// [Sync] 2026-07-07: route the connector entry into ChatView so the connector workbench lives under the chat shell instead of a standalone page.
+// [Sync] 2026-07-07: mount ChatView in a fixed flex viewport so embedded connector panels cannot force page-level overflow.
+// [Sync] 2026-07-08: route Connector navigation to Settings resource-link management and keep Chat on the lightweight landing panel only.
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Commentor, EditorState, TextCell } from './engine/EditorEngine';
@@ -8,7 +27,7 @@ import './App.css';
 import {
   FaBrain, FaHeart, FaQuestion, FaCloud, FaTheaterMasks, FaEye,
   FaFistRaised, FaLightbulb, FaShieldAlt, FaWind, FaFire, FaCompass,
-  FaPenNib, FaRegClock, FaChartBar, FaLayerGroup, FaCog,
+  FaPenNib, FaRegClock, FaChartBar, FaLayerGroup, FaCog, FaComments,
 } from 'react-icons/fa';
 import TopNavBar from './components/TopNavBar';
 import LeftToolbar from './components/LeftToolbar';
@@ -22,14 +41,15 @@ import AgentDropdown from './components/AgentDropdown';
 import ChatWidgetUI from './components/ChatWidgetUI';
 import StateChooser from './components/StateChooser';
 import type { VoiceConfig } from './api/voiceApi';
-import { getVoices, getMetaPrompt, getStateConfig } from './utils/voiceStorage';
-import { getDefaultVoices, chatWithVoice, importLocalData, loadVoicesFromDecks } from './api/voiceApi';
+import { getVoices, getStateConfig } from './utils/voiceStorage';
+import { getDefaultVoices, chatWithVoiceSSE, importLocalData, loadVoicesFromDecks, ensureVoiceThread } from './api/voiceApi';
 import { useMobile } from './utils/mobileDetect';
 import { CommentGroupCard } from './components/CommentCard';
 import { findNormalizedPhrase } from './utils/textNormalize';
 import { useAuth } from './contexts/AuthContext';
 import LoginForm from './components/Auth/LoginForm';
 import RegisterForm from './components/Auth/RegisterForm';
+import DeviceVerificationPage from './components/Auth/DeviceVerificationPage';
 import { STORAGE_KEYS } from './constants/storageKeys';
 import { getLocalDayKey, getTodayKeyInTimezone } from './utils/timezone';
 import { useSessionLifecycle } from './hooks/useSessionLifecycle';
@@ -38,6 +58,16 @@ import { InspirationHint } from './components/Editor/InspirationHint';
 import { useComments } from './hooks/useComments';
 import { useTextCells } from './hooks/useTextCells';
 import { useVoiceInput } from './hooks/useVoiceInput';
+import { useEditSessionEvents } from './hooks/useEditSessionEvents';
+import ChatView from './components/chat/ChatView';
+import ModelConfigSection from './components/dashboard/ModelConfigSection';
+import ConnectorSettingsSection from './components/dashboard/ConnectorSettingsSection';
+import ConnectorNotionDetailPage from './components/dashboard/ConnectorNotionDetailPage';
+import type { ActiveChatVoice } from './lib/chat-schema';
+import {
+  EDITOR_WRITE_COMPLETED_TOOL_CACHE_MS,
+  EDITOR_WRITE_EVENT_FALLBACK_TIMEOUT_MS,
+} from './constants/sessionSync';
 
 // @@@ Icon map with React Icons
 const iconMap = {
@@ -56,6 +86,12 @@ const iconMap = {
 };
 
 const LANGUAGE_CODES: Array<'en' | 'zh'> = ['en', 'zh'];
+
+// [Sync] 2026-07-08: Settings default sections use a narrower reading-width column;
+// the Notion ConnectorNotionDetailPage owns a wider single-account resource
+// configuration layout, so it gets its own max width instead of sharing SETTINGS_MAX_WIDTH_PX.
+const SETTINGS_MAX_WIDTH_PX = 800;
+const SETTINGS_CONNECTOR_DETAIL_MAX_WIDTH_PX = 1220;
 
 // @@@ Color map with gradient colors for watercolor effect
 const colorMap: Record<string, { gradient: string; text: string; glow: string }> = {
@@ -90,6 +126,7 @@ const colorMap: Record<string, { gradient: string; text: string; glow: string }>
 export default function App() {
   const isMobile = useMobile();
   const { isAuthenticated, isLoading } = useAuth();
+  const isDeviceVerificationRoute = window.location.pathname === '/oauth/device/verify';
   const { t, i18n } = useTranslation();
   const mobileNavHeight = 64;
   const mobileBottomOffset = isMobile
@@ -120,9 +157,41 @@ export default function App() {
     }
   }, [currentLanguage, i18n]);
 
-  const [currentView, setCurrentView] = useState<'writing' | 'settings' | 'timeline' | 'analysis' | 'decks'>('writing');
+  const [currentView, setCurrentView] = useState<'writing' | 'settings' | 'timeline' | 'analysis' | 'decks' | 'chat' | 'connector'>('writing');
+  const [connectorSettingsFocusNonce, setConnectorSettingsFocusNonce] = useState(0);
+  const [chatLandingTab, setChatLandingTab] = useState<'history' | 'connector'>('history');
+  const [hasOpenedChatView, setHasOpenedChatView] = useState(false);
+  const shouldRenderChatView = hasOpenedChatView || currentView === 'chat';
   const [showCalendarPopup, setShowCalendarPopup] = useState(false);
   const [voiceConfigs, setVoiceConfigs] = useState<Record<string, VoiceConfig>>({});
+  // [Sync] 2026-07-08: track whether the dedicated Notion "具体配置页面" is open; navigating into it
+  //                    replaces the whole Settings viewport instead of expanding inline within the
+  //                    resource-link card, matching the connector interaction design's page navigation.
+  const [showNotionConnectorDetail, setShowNotionConnectorDetail] = useState(false);
+
+  const openConnectorSettings = useCallback(() => {
+    setCurrentView('settings');
+    setShowNotionConnectorDetail(false);
+    setConnectorSettingsFocusNonce((value) => value + 1);
+    setChatLandingTab('connector');
+  }, []);
+
+  const openNotionConnectorDetail = useCallback(() => {
+    setShowNotionConnectorDetail(true);
+  }, []);
+
+  const closeNotionConnectorDetail = useCallback(() => {
+    setShowNotionConnectorDetail(false);
+    setConnectorSettingsFocusNonce((value) => value + 1);
+  }, []);
+
+  const handleAppViewChange = useCallback((view: 'writing' | 'settings' | 'timeline' | 'analysis' | 'decks' | 'chat' | 'connector') => {
+    if (view === 'connector') {
+      openConnectorSettings();
+      return;
+    }
+    setCurrentView(view);
+  }, [openConnectorSettings]);
 
   const browserTimezone = useMemo(() => {
     try {
@@ -137,6 +206,8 @@ export default function App() {
     engineRef,
     state,
     setState,
+    currentSessionLabels,
+    setCurrentSessionLabels,
     selectedState,
     setSelectedState,
     selectedStateLoading,
@@ -159,6 +230,12 @@ export default function App() {
   const [dropdownPosition, setDropdownPosition] = useState({ x: 0, y: 0 });
   const [dropdownTriggerCellId, setDropdownTriggerCellId] = useState<string | null>(null);
   const [chatProcessing, setChatProcessing] = useState<Set<string>>(new Set());
+  /** Per-widget streaming state: text response + reasoning/thinking deltas. */
+  const [chatStreaming, setChatStreaming] = useState<Map<string, { text: string; reasoning: string; reasoningDone: boolean }>>(new Map());
+  /** @@@ Thread to open in ChatView (set when navigating from Deck or editor widget). */
+  const [requestedChatThreadId, setRequestedChatThreadId] = useState<string | undefined>(undefined);
+  /** @@@ Active deck voice shown in ChatView top-right badge; carries system prompt forwarded to the agent. */
+  const [activeChatVoice, setActiveChatVoice] = useState<ActiveChatVoice | undefined>(undefined);
 
   // @@@ Warning dialog state
   const [showWarning, setShowWarning] = useState(false);
@@ -245,6 +322,79 @@ export default function App() {
     engineRef,
   });
 
+  const pendingEditorWriteFallbacksRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const completedEditorWriteToolIdsRef = useRef<Set<string>>(new Set());
+  const completedEditorWriteCleanupRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  const rememberCompletedEditorWriteTool = useCallback((toolCallId: string) => {
+    completedEditorWriteToolIdsRef.current.add(toolCallId);
+
+    const existingTimer = completedEditorWriteCleanupRef.current.get(toolCallId);
+    if (existingTimer) clearTimeout(existingTimer);
+
+    const cleanupTimer = setTimeout(() => {
+      completedEditorWriteToolIdsRef.current.delete(toolCallId);
+      completedEditorWriteCleanupRef.current.delete(toolCallId);
+    }, EDITOR_WRITE_COMPLETED_TOOL_CACHE_MS);
+    completedEditorWriteCleanupRef.current.set(toolCallId, cleanupTimer);
+  }, []);
+
+  const reloadEditorSessionFromDatabase = useCallback(async (sessionId: string) => {
+    if (!isAuthenticated || !engineRef.current) return;
+    const liveSessionId = engineRef.current.getState().id;
+    if (liveSessionId !== sessionId) return;
+
+    try {
+      const { getSession } = await import('./api/voiceApi');
+      const sessionData = await getSession(sessionId);
+      if (sessionData?.editor_state && engineRef.current?.getState().id === sessionId) {
+        const refreshed: EditorState = {
+          ...sessionData.editor_state,
+          id: sessionId,
+        };
+        engineRef.current.loadState(refreshed, { source: 'remote' });
+        setState({ ...engineRef.current.getState() });
+        setCurrentSessionLabels(sessionData.labels);
+        setRefsReady(prev => prev + 1);
+      }
+    } catch (error) {
+      console.error('Failed to reload editor state after agent write:', error);
+    }
+  }, [engineRef, isAuthenticated, setCurrentSessionLabels, setRefsReady, setState]);
+
+  useEditSessionEvents(isAuthenticated, {
+    onEvent: (event) => {
+      if (event.type !== 'session_updated' || event.source !== 'agent' || !event.sessionId) {
+        return;
+      }
+
+      if (event.toolCallId) {
+        const pendingTimeout = pendingEditorWriteFallbacksRef.current.get(event.toolCallId);
+        if (pendingTimeout) {
+          clearTimeout(pendingTimeout);
+          pendingEditorWriteFallbacksRef.current.delete(event.toolCallId);
+        }
+        rememberCompletedEditorWriteTool(event.toolCallId);
+      }
+
+      void reloadEditorSessionFromDatabase(event.sessionId);
+    },
+  });
+
+  useEffect(() => {
+    const pendingFallbacks = pendingEditorWriteFallbacksRef.current;
+    const completedCleanup = completedEditorWriteCleanupRef.current;
+    const completedToolIds = completedEditorWriteToolIdsRef.current;
+
+    return () => {
+      pendingFallbacks.forEach((timer) => clearTimeout(timer));
+      pendingFallbacks.clear();
+      completedCleanup.forEach((timer) => clearTimeout(timer));
+      completedCleanup.clear();
+      completedToolIds.clear();
+    };
+  }, []);
+
   const energyThreshold = 50;
   const appliedComments = state?.commentors.filter(c => c.appliedAt) ?? [];
   const lastEntry = state?.weightPath[state.weightPath.length - 1];
@@ -264,6 +414,7 @@ export default function App() {
     { key: 'timeline' as const, label: t('nav.timeline'), icon: FaRegClock },
     { key: 'analysis' as const, label: t('nav.analysis'), icon: FaChartBar },
     { key: 'decks' as const, label: t('nav.decks'), icon: FaLayerGroup },
+    { key: 'chat' as const, label: t('nav.chat'), icon: FaComments },
     { key: 'settings' as const, label: t('nav.settings'), icon: FaCog },
   ];
 
@@ -313,6 +464,13 @@ export default function App() {
     if (currentView === 'writing') {
       // Force re-render to recalculate comment positions
       setRefsReady(prev => prev + 1);
+    }
+  }, [currentView]);
+
+  // @@@ Preserve ChatView local state after the first visit while avoiding eager thread creation on app load.
+  useEffect(() => {
+    if (currentView === 'chat') {
+      setHasOpenedChatView(true);
     }
   }, [currentView]);
 
@@ -468,14 +626,14 @@ export default function App() {
         position: fixed;
         top: 70px;
         right: 20px;
-        background: #f44336;
+        background: var(--color-state-error);
         color: white;
         padding: 12px 20px;
         borderRadius: 6px;
         fontSize: 14px;
         fontFamily: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto;
         zIndex: 10000;
-        boxShadow: 0 4px 12px rgba(0,0,0,0.15);
+        boxShadow: 0 4px 12px var(--color-shadow-medium);
       `;
       document.body.appendChild(toast);
       setTimeout(() => {
@@ -499,14 +657,14 @@ export default function App() {
         position: fixed;
         top: 70px;
         right: 20px;
-        background: #4CAF50;
+        background: var(--color-state-success);
         color: white;
         padding: 12px 20px;
         borderRadius: 6px;
         fontSize: 14px;
         fontFamily: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto;
         zIndex: 10000;
-        boxShadow: 0 4px 12px rgba(0,0,0,0.15);
+        boxShadow: 0 4px 12px var(--color-shadow-medium);
     `;
       document.body.appendChild(toast);
       setTimeout(() => {
@@ -523,14 +681,14 @@ export default function App() {
         position: fixed;
         top: 70px;
         right: 20px;
-        background: #f44336;
+        background: var(--color-state-error);
         color: white;
         padding: 12px 20px;
         borderRadius: 6px;
         fontSize: 14px;
         fontFamily: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto;
         zIndex: 10000;
-        boxShadow: 0 4px 12px rgba(0,0,0,0.15);
+        boxShadow: 0 4px 12px var(--color-shadow-medium);
       `;
       document.body.appendChild(toast);
       setTimeout(() => {
@@ -551,6 +709,7 @@ export default function App() {
     };
 
     engineRef.current.loadState(nextState);
+    setCurrentSessionLabels(entry.labels ?? []);
     if (nextState.selectedState !== undefined) {
       setSelectedState(nextState.selectedState);
     }
@@ -649,6 +808,60 @@ export default function App() {
   const handleToggleAlign = useCallback(() => {
     setCommentsAligned(prev => !prev);
   }, []);
+
+  // @@@ Reload editor state after Agent MCP write completion.
+  // The primary path is /api/sessions/events (source=agent, keyed by toolCallId).
+  // If the stream is unavailable, a bounded fallback pulls the current session.
+  const handleEditorWriteConfirmed = useCallback((toolCallId?: string) => {
+    if (!isAuthenticated || !state?.id || !engineRef.current) return;
+    const sessionId = engineRef.current.getState().id || state.id;
+    const fallbackKey = toolCallId || `session:${sessionId}`;
+
+    if (toolCallId && completedEditorWriteToolIdsRef.current.has(toolCallId)) {
+      return;
+    }
+    if (pendingEditorWriteFallbacksRef.current.has(fallbackKey)) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      pendingEditorWriteFallbacksRef.current.delete(fallbackKey);
+      void reloadEditorSessionFromDatabase(sessionId);
+    }, EDITOR_WRITE_EVENT_FALLBACK_TIMEOUT_MS);
+    pendingEditorWriteFallbacksRef.current.set(fallbackKey, timeout);
+  }, [engineRef, isAuthenticated, reloadEditorSessionFromDatabase, state?.id]);
+
+  // @@@ Jump to a specific cell in the writing view (triggered by editor:jump-to-cell custom event)
+  const jumpToCellRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const cellId = (e as CustomEvent<{ cellId: string }>).detail?.cellId;
+      if (!cellId) return;
+      jumpToCellRef.current = cellId;
+      setCurrentView('writing');
+    };
+    window.addEventListener('editor:jump-to-cell', handler);
+    return () => window.removeEventListener('editor:jump-to-cell', handler);
+  }, []);
+
+  useEffect(() => {
+    if (currentView !== 'writing' || !jumpToCellRef.current) return;
+    const cellId = jumpToCellRef.current;
+    jumpToCellRef.current = null;
+    const attemptScroll = (attempts = 0) => {
+      const textarea = textareaRefs.current.get(cellId);
+      if (textarea) {
+        textarea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        textarea.focus();
+        return;
+      }
+      if (attempts < 10) {
+        setTimeout(() => attemptScroll(attempts + 1), 80);
+      }
+    };
+    setTimeout(() => attemptScroll(), 100);
+  }, [currentView]);
 
   // @@@ Handle localStorage migration
   const handleMigrateData = useCallback(async () => {
@@ -771,7 +984,15 @@ export default function App() {
     }
   }, [composingCells, handleTextCellKeyDown]);
 
-  // @@@ Handle agent selection from dropdown
+  // @@@ Navigate to Chat view with a specific thread (used by editor widgets and Deck manager).
+  const handleOpenChatThread = useCallback((threadId: string, voiceInfo?: ActiveChatVoice) => {
+    setRequestedChatThreadId(threadId);
+    setActiveChatVoice(voiceInfo);
+    setCurrentView('chat');
+    setHasOpenedChatView(true);
+  }, []);
+
+  // @@@ Handle agent selection from dropdown — creates a Claude-agent thread and inserts an Agent Link widget.
   const handleAgentSelect = useCallback((voiceName: string, voiceConfig: VoiceConfig) => {
     setDropdownVisible(false);
 
@@ -785,76 +1006,168 @@ export default function App() {
 
     const cursorPos = textarea.selectionStart;
 
-    // Create chat widget
-    const chatWidget = new ChatWidget(voiceName, voiceConfig);
+    // Snapshot widget IDs before insertion to identify the newly added widget
+    const beforeWidgetIds = new Set(
+      engineRef.current.getState().cells
+        .filter(c => c.type === 'widget')
+        .map(c => c.id)
+    );
 
-    // Insert widget at cursor (engine will handle @ removal)
+    // Insert widget immediately (without thread_id yet – shows "Creating thread…")
+    const chatWidget = new ChatWidget(voiceName, voiceConfig);
     engineRef.current.insertWidgetAtCursor(dropdownTriggerCellId, cursorPos, 'chat', chatWidget.getData());
     setDropdownTriggerCellId(null);
-  }, [dropdownTriggerCellId]);
 
-  // @@@ Handle sending chat message
-  const handleChatSend = useCallback(async (widgetId: string, message: string) => {
-    if (!engineRef.current || !state) return;
+    // Identify the newly inserted widget
+    const updatedCells = engineRef.current.getState().cells;
+    const newWidget = updatedCells.find(c => c.type === 'widget' && !beforeWidgetIds.has(c.id));
 
-    // Find widget
-    const widgetCell = state.cells.find(c => c.type === 'widget' && c.id === widgetId);
-    if (!widgetCell || widgetCell.type !== 'widget') return;
+    // Create Claude-agent thread asynchronously, then update widget with thread_id.
+    // The user stays in the Writing view — the inline ChatWidgetUI handles the conversation.
+    void (async () => {
+      try {
+        const threadId = await ensureVoiceThread(voiceName, voiceConfig.thread_id);
+        if (newWidget && engineRef.current) {
+          const widgetWithThread = new ChatWidget(voiceName, voiceConfig, threadId);
+          engineRef.current.updateWidgetData(newWidget.id, widgetWithThread.getData());
+        }
+      } catch (err) {
+        console.error('Failed to create Claude-agent thread for voice:', err);
+      }
+    })();
 
-    const widgetData = widgetCell.data as ChatWidgetData;
-    const chatWidget = ChatWidget.fromData(widgetData);
-
-    // Add user message optimistically
-    chatWidget.addUserMessage(message);
-    engineRef.current.updateWidgetData(widgetId, chatWidget.getData());
-
-    // Mark as processing
-    setChatProcessing(prev => new Set(prev).add(widgetId));
-
-    try {
-      // Get ALL text from all text cells as unified context
-      const allText = state.cells
-        .filter(c => c.type === 'text')
-        .map(c => (c as TextCell).content)
-        .join('');
-
-      const metaPrompt = getMetaPrompt();
-      const statePrompt = selectedState && stateConfig.states[selectedState]
-        ? stateConfig.states[selectedState].prompt
-        : '';
-
-      // @@@ Use voiceName (which is the voice ID/key) for backend lookup
-      // Backend loads voice config from database using user_id from JWT
-      const response = await chatWithVoice(
-        widgetData.voiceName,  // This is the voice ID (key like "holder", "mirror")
-        chatWidget.getConversationHistory().slice(0, -1), // Exclude last message (just added)
-        message,
-        allText,
-        metaPrompt,
-        statePrompt
-      );
-
-      // Add assistant response
-      chatWidget.addAssistantMessage(response);
-      engineRef.current.updateWidgetData(widgetId, chatWidget.getData());
-    } catch (error) {
-      console.error('Chat failed:', error);
-      chatWidget.addAssistantMessage('Sorry, I encountered an error.');
-      engineRef.current.updateWidgetData(widgetId, chatWidget.getData());
-    } finally {
-      setChatProcessing(prev => {
-        const next = new Set(prev);
-        next.delete(widgetId);
-        return next;
-      });
+    // Focus the text cell immediately after the newly inserted widget
+    if (newWidget) {
+      const widgetIdx = updatedCells.findIndex(c => c.id === newWidget.id);
+      const nextCell = widgetIdx >= 0 && widgetIdx + 1 < updatedCells.length
+        ? updatedCells[widgetIdx + 1]
+        : null;
+      if (nextCell && nextCell.type === 'text') {
+        const nextCellId = nextCell.id;
+        setTimeout(() => {
+          const nextTextarea = textareaRefs.current.get(nextCellId);
+          if (nextTextarea) {
+            nextTextarea.focus();
+            nextTextarea.selectionStart = 0;
+            nextTextarea.selectionEnd = 0;
+          }
+        }, 0);
+      }
     }
-  }, [state, selectedState, stateConfig]);
+  }, [dropdownTriggerCellId]);
 
   // @@@ Handle deleting chat widget
   const handleChatDelete = useCallback((widgetId: string) => {
     if (!engineRef.current) return;
     engineRef.current.deleteCell(widgetId);
   }, []);
+
+  const handleChatToggleCollapse = useCallback((widgetId: string, collapsed: boolean) => {
+    if (!engineRef.current || !state) return;
+    const widgetCell = state.cells.find(c => c.type === 'widget' && c.id === widgetId);
+    if (!widgetCell || widgetCell.type !== 'widget') return;
+    const updated = { ...(widgetCell.data as ChatWidgetData), collapsed };
+    engineRef.current.updateWidgetData(widgetId, updated);
+  }, [state]);
+
+  // @@@ Handle sending chat message — streams via Claude-agent SSE
+  const handleChatSend = useCallback(async (widgetId: string, message: string) => {
+    if (!engineRef.current || !state) return;
+
+    const widgetCell = state.cells.find(c => c.type === 'widget' && c.id === widgetId);
+    if (!widgetCell || widgetCell.type !== 'widget') return;
+
+    const rawData = widgetCell.data as Partial<ChatWidgetData>;
+    // Guard against malformed or old-format widget data
+    const widgetData: ChatWidgetData = {
+      id: rawData.id ?? widgetId,
+      voiceName: rawData.voiceName ?? '',
+      voiceConfig: rawData.voiceConfig ?? { name: 'Agent', tagline: '', icon: 'brain', color: 'blue' },
+      threadId: rawData.threadId,
+      messages: rawData.messages ?? [],
+      createdAt: rawData.createdAt ?? Date.now(),
+    };
+    const chatWidget = ChatWidget.fromData(widgetData);
+
+    // Optimistically add user message
+    chatWidget.addUserMessage(message);
+    engineRef.current.updateWidgetData(widgetId, chatWidget.getData());
+
+    setChatProcessing(prev => new Set(prev).add(widgetId));
+    setChatStreaming(prev => { const m = new Map(prev); m.set(widgetId, { text: '', reasoning: '', reasoningDone: false }); return m; });
+
+    // Ensure the widget has a thread_id before sending
+    let threadId = widgetData.threadId;
+    if (!threadId) {
+      try {
+        threadId = await ensureVoiceThread(widgetData.voiceName, undefined);
+        // Persist thread_id back into widget data
+        chatWidget.getData().threadId = threadId;
+        engineRef.current.updateWidgetData(widgetId, chatWidget.getData());
+      } catch (err) {
+        console.error('Failed to create thread for widget:', err);
+        chatWidget.addAssistantMessage('Sorry, I could not start a session.');
+        engineRef.current.updateWidgetData(widgetId, chatWidget.getData());
+        setChatProcessing(prev => { const s = new Set(prev); s.delete(widgetId); return s; });
+        setChatStreaming(prev => { const m = new Map(prev); m.delete(widgetId); return m; });
+        return;
+      }
+    }
+
+    const systemPrompt = widgetData.voiceConfig.tagline || '';
+
+    await chatWithVoiceSSE({
+      threadId,
+      message,
+      systemPrompt,
+      editorState: state ? (state as unknown as Record<string, unknown>) : null,
+      onDelta: (delta) => {
+        setChatStreaming(prev => {
+          const m = new Map(prev);
+          const cur = m.get(widgetId) ?? { text: '', reasoning: '', reasoningDone: false };
+          m.set(widgetId, { ...cur, text: cur.text + delta });
+          return m;
+        });
+      },
+      onReasoningDelta: (delta) => {
+        setChatStreaming(prev => {
+          const m = new Map(prev);
+          const cur = m.get(widgetId) ?? { text: '', reasoning: '', reasoningDone: false };
+          m.set(widgetId, { ...cur, reasoning: cur.reasoning + delta });
+          return m;
+        });
+      },
+      onReasoningEnd: () => {
+        setChatStreaming(prev => {
+          const m = new Map(prev);
+          const cur = m.get(widgetId);
+          if (cur) m.set(widgetId, { ...cur, reasoningDone: true });
+          return m;
+        });
+      },
+      onComplete: (fullText, reasoning) => {
+        const currentCell = engineRef.current?.getState()?.cells.find(c => c.id === widgetId);
+        const finalWidget = currentCell?.type === 'widget'
+          ? ChatWidget.fromData(currentCell.data as ChatWidgetData)
+          : chatWidget;
+        finalWidget.addAssistantMessage(fullText || 'Sorry, I could not respond.', reasoning);
+        engineRef.current?.updateWidgetData(widgetId, finalWidget.getData());
+        setChatProcessing(prev => { const s = new Set(prev); s.delete(widgetId); return s; });
+        setChatStreaming(prev => { const m = new Map(prev); m.delete(widgetId); return m; });
+      },
+      onError: (error) => {
+        console.error('Chat SSE failed:', error);
+        const currentCell = engineRef.current?.getState()?.cells.find(c => c.id === widgetId);
+        const finalWidget = currentCell?.type === 'widget'
+          ? ChatWidget.fromData(currentCell.data as ChatWidgetData)
+          : chatWidget;
+        finalWidget.addAssistantMessage('Sorry, I encountered an error.');
+        engineRef.current?.updateWidgetData(widgetId, finalWidget.getData());
+        setChatProcessing(prev => { const s = new Set(prev); s.delete(widgetId); return s; });
+        setChatStreaming(prev => { const m = new Map(prev); m.delete(widgetId); return m; });
+      },
+    });
+  }, [state]);
 
   // @@@ Helper to get watercolor background
   const getWatercolorBg = (color: string) => {
@@ -945,7 +1258,7 @@ export default function App() {
         height: '100vh',
         fontFamily: "'Excalifont', 'Xiaolai', 'Georgia', serif",
         fontSize: '18px',
-        color: '#666'
+        color: 'var(--color-text-secondary)'
       }}>
         Loading...
       </div>
@@ -954,6 +1267,10 @@ export default function App() {
 
   // @@@ Show auth screen if not authenticated
   const loginBannerUrl = `${import.meta.env.BASE_URL}login-banner.jpg`;
+
+  if (isDeviceVerificationRoute) {
+    return <DeviceVerificationPage />;
+  }
 
   if (!isAuthenticated) {
     return (
@@ -1006,8 +1323,8 @@ export default function App() {
           padding: '20px'
         }}>
           <div style={{
-            backgroundColor: '#fffef9',
-            border: '2px solid #d0c4b0',
+            backgroundColor: 'var(--color-bg-paper)',
+            border: '2px solid var(--color-border-paper)',
             borderRadius: '12px',
             padding: '32px',
             maxWidth: '500px',
@@ -1017,7 +1334,7 @@ export default function App() {
             <h2 style={{
               margin: '0 0 16px 0',
               fontSize: '24px',
-              color: '#333',
+              color: 'var(--color-text-body)',
               fontWeight: 600
             }}>
               Migrate Your Data?
@@ -1026,7 +1343,7 @@ export default function App() {
               margin: '0 0 24px 0',
               fontSize: '16px',
               lineHeight: '1.6',
-              color: '#555'
+              color: 'var(--color-text-secondary)'
             }}>
               We found data in your browser. Would you like to migrate it to your account?
               This will move all your sessions, pictures, and preferences to the cloud.
@@ -1043,20 +1360,20 @@ export default function App() {
                   flex: 1,
                   padding: '12px 20px',
                   border: 'none',
-                  background: isMigrating ? '#ccc' : '#4a90e2',
+                  background: isMigrating ? 'var(--color-disabled-bg)' : 'var(--color-action-link)',
                   borderRadius: '6px',
                   cursor: isMigrating ? 'not-allowed' : 'pointer',
                   fontSize: '16px',
                   fontFamily: "'Excalifont', 'Xiaolai', 'Georgia', serif",
-                  color: '#fff',
+                  color: 'var(--color-text-on-action)',
                   fontWeight: 600,
                   transition: 'all 0.2s'
                 }}
                 onMouseEnter={(e) => {
-                  if (!isMigrating) e.currentTarget.style.backgroundColor = '#357abd';
+                  if (!isMigrating) e.currentTarget.style.backgroundColor = 'var(--color-action-link-hover)';
                 }}
                 onMouseLeave={(e) => {
-                  if (!isMigrating) e.currentTarget.style.backgroundColor = '#4a90e2';
+                  if (!isMigrating) e.currentTarget.style.backgroundColor = 'var(--color-action-link)';
                 }}
               >
                 {isMigrating ? 'Migrating...' : 'Migrate Data'}
@@ -1067,20 +1384,20 @@ export default function App() {
                 style={{
                   flex: 1,
                   padding: '12px 20px',
-                  border: '1px solid #d0c4b0',
-                  background: '#fff',
+                  border: '1px solid var(--color-border-paper)',
+                  background: 'var(--color-bg-surface-solid)',
                   borderRadius: '6px',
                   cursor: isMigrating ? 'not-allowed' : 'pointer',
                   fontSize: '16px',
                   fontFamily: "'Excalifont', 'Xiaolai', 'Georgia', serif",
-                  color: '#666',
+                  color: 'var(--color-text-secondary)',
                   transition: 'all 0.2s'
                 }}
                 onMouseEnter={(e) => {
-                  if (!isMigrating) e.currentTarget.style.backgroundColor = '#f5f5f5';
+                  if (!isMigrating) e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
                 }}
                 onMouseLeave={(e) => {
-                  if (!isMigrating) e.currentTarget.style.backgroundColor = '#fff';
+                  if (!isMigrating) e.currentTarget.style.backgroundColor = 'var(--color-bg-surface-solid)';
                 }}
               >
                 Skip
@@ -1091,7 +1408,7 @@ export default function App() {
       )}
 
       {/* @@@ Hide top nav on mobile */}
-      {!isMobile && <TopNavBar currentView={currentView} onViewChange={setCurrentView} />}
+      {!isMobile && <TopNavBar currentView={currentView} onViewChange={handleAppViewChange} />}
 
       {currentView === 'writing' && (
         <div style={{
@@ -1116,23 +1433,23 @@ export default function App() {
                 height: '32px',
                 border: 'none',
                 borderRadius: '50%',
-                backgroundColor: '#fff',
+                backgroundColor: 'var(--color-bg-surface-solid)',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                boxShadow: '0 2px 6px var(--color-shadow-medium)',
                 fontSize: '20px',
                 fontWeight: '300',
-                color: '#666',
+                color: 'var(--color-text-secondary)',
                 transition: 'all 0.2s ease'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#f8f8f8';
+                e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
                 e.currentTarget.style.transform = 'scale(1.1)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#fff';
+                e.currentTarget.style.backgroundColor = 'var(--color-bg-surface-solid)';
                 e.currentTarget.style.transform = 'scale(1)';
               }}
             >
@@ -1178,23 +1495,23 @@ export default function App() {
                   height: '44px',
                   border: 'none',
                   borderRadius: '50%',
-                  backgroundColor: '#fff',
+                  backgroundColor: 'var(--color-bg-surface-solid)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                  boxShadow: '0 2px 6px var(--color-shadow-medium)',
                   fontSize: '24px',
                   fontWeight: '300',
-                  color: '#666',
+                  color: 'var(--color-text-secondary)',
                   transition: 'all 0.2s ease'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f8f8f8';
+                  e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
                   e.currentTarget.style.transform = 'scale(1.1)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#fff';
+                  e.currentTarget.style.backgroundColor = 'var(--color-bg-surface-solid)';
                   e.currentTarget.style.transform = 'scale(1)';
                 }}
               >
@@ -1208,16 +1525,16 @@ export default function App() {
                   height: '44px',
                   border: 'none',
                   borderRadius: '50%',
-                  backgroundColor: '#fff',
+                  backgroundColor: 'var(--color-bg-surface-solid)',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                  boxShadow: '0 2px 8px var(--color-shadow-medium)',
                   transition: 'all 0.2s ease',
                   fontSize: '24px',
                   fontWeight: 600,
-                  color: '#333',
+                  color: 'var(--color-text-body)',
                   fontFamily: 'monospace'
                 }}
               >
@@ -1259,7 +1576,7 @@ export default function App() {
                   paddingBottom: isMobile
                     ? `calc(80px + ${mobileNavHeight}px + env(safe-area-inset-bottom, 0px))`
                     : '80px',  // Extra space for smooth scrolling to bottom
-                  backgroundColor: '#fffef9'  // @@@ Cream paper background for notebook lines
+                  backgroundColor: 'var(--color-bg-paper)'  // @@@ Cream paper background for notebook lines
                 }}>
                 <div style={{
                   position: 'relative',
@@ -1275,6 +1592,7 @@ export default function App() {
                       selectedState={state?.selectedState ?? selectedState}
                       selectedStateLoading={selectedStateLoading}
                       createdAt={state?.createdAt}
+                      sessionLabels={currentSessionLabels}
                       onChoose={handleStateChoose}
                     />
                   </div>
@@ -1329,8 +1647,8 @@ export default function App() {
                               lineHeight: '1.8',
                               fontFamily: "'Excalifont', 'Xiaolai', 'Georgia', serif",
                               background: 'transparent',
-                              color: '#333',
-                              caretColor: '#333',
+                              color: 'var(--color-text-body)',
+                              caretColor: 'var(--color-text-body)',
                               position: 'relative',
                               zIndex: 1,
                               marginBottom: '0px',
@@ -1351,8 +1669,21 @@ export default function App() {
                           key={cell.id}
                           data={cell.data as ChatWidgetData}
                           onSendMessage={(msg) => handleChatSend(cell.id, msg)}
+                          onOpenChat={(cell.data as ChatWidgetData).threadId ? (threadId) => {
+                            const d = cell.data as ChatWidgetData;
+                            handleOpenChatThread(threadId, {
+                              name: d.voiceConfig.name,
+                              systemPrompt: d.voiceConfig.tagline,
+                              icon: d.voiceConfig.icon,
+                              color: d.voiceConfig.color,
+                            });
+                          } : undefined}
                           onDelete={() => handleChatDelete(cell.id)}
+                          onToggleCollapse={(collapsed) => handleChatToggleCollapse(cell.id, collapsed)}
                           isProcessing={chatProcessing.has(cell.id)}
+                          streamingText={chatStreaming.get(cell.id)?.text}
+                          streamingReasoning={chatStreaming.get(cell.id)?.reasoning}
+                          isReasoningDone={chatStreaming.get(cell.id)?.reasoningDone}
                         />
                       );
                     }
@@ -1457,11 +1788,11 @@ export default function App() {
                     bottom: `calc(${mobileNavHeight}px + 20px + env(safe-area-inset-bottom, 0px))`,
                     left: '10px',
                     right: '10px',
-                    background: '#fff',
-                    border: '2px solid #ddd',
+                    background: 'var(--color-bg-surface-solid)',
+                    border: '2px solid var(--color-border-neutral)',
                     borderRadius: '12px',
                     padding: '16px',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
+                    boxShadow: '0 8px 24px var(--color-shadow-medium)',
                     zIndex: 100,
                     fontFamily: "'Excalifont', 'Xiaolai', 'Georgia', serif",
                     animation: 'slideInFromBottom 0.3s ease-out'
@@ -1481,7 +1812,7 @@ export default function App() {
                               <div style={{ fontWeight: 600, fontSize: '16px', color: colors.text, marginBottom: '8px' }}>
                                 {mobileActiveComment.voice}
                               </div>
-                              <div style={{ fontSize: '15px', lineHeight: '1.5', color: '#444' }}>
+                              <div style={{ fontSize: '15px', lineHeight: '1.5', color: 'var(--color-text-body)' }}>
                                 {mobileActiveComment.comment}
                               </div>
                             </div>
@@ -1500,13 +1831,13 @@ export default function App() {
                 left: 0,
                 right: 0,
                 padding: isMobile ? '8px 12px' : '10px 20px',
-                borderTop: '1px solid #e0e0e0',
+                borderTop: '1px solid var(--color-border-neutral)',
                 fontSize: isMobile ? '11px' : '12px',
-                color: '#666',
+                color: 'var(--color-text-secondary)',
                 display: 'flex',
                 gap: isMobile ? '12px' : '20px',
                 flexWrap: isMobile ? 'wrap' : 'nowrap',
-                backgroundColor: '#fafafa',
+                backgroundColor: 'var(--color-bg-paper)',
                 zIndex: 50
               }}>
                 <span>Weight: {lastEntry?.weight || 0}</span>
@@ -1537,7 +1868,7 @@ export default function App() {
                             display: 'block',
                             height: '100%',
                             width: `${Math.round(energyProgress * 100)}%`,
-                            background: '#666',
+                            background: 'var(--color-text-secondary)',
                             borderRadius: '999px',
                             transition: 'width 0.25s ease',
                           }}
@@ -1568,11 +1899,12 @@ export default function App() {
           left: 0,
           right: 0,
           bottom: mobileBottomOffset,
-          background: '#f8f0e6',
+          background: 'var(--color-bg-app)',
           display: 'flex',
           overflow: 'hidden'
         }}>
-          <DeckManager onUpdate={async () => {
+          <DeckManager
+            onUpdate={async () => {
             // @@@ Reload voice configs from deck system
             console.log('Deck system updated, reloading voices...');
             const updatedVoices = await loadVoicesFromDecks();
@@ -1583,7 +1915,9 @@ export default function App() {
             }
 
             console.log(`✅ Loaded ${Object.keys(updatedVoices).length} enabled voices`);
-          }} />
+          }}
+            onOpenChat={handleOpenChatThread}
+          />
         </div>
       )}
       {currentView === 'settings' && (
@@ -1598,25 +1932,30 @@ export default function App() {
           left: 0,
           right: 0,
           bottom: mobileBottomOffset,
-          background: '#f8f0e6'
+          background: 'var(--color-bg-app)'
         }}>
+          {showNotionConnectorDetail ? (
+            <div style={{ maxWidth: SETTINGS_CONNECTOR_DETAIL_MAX_WIDTH_PX, width: '100%' }}>
+              <ConnectorNotionDetailPage onBack={closeNotionConnectorDetail} isMobile={isMobile} />
+            </div>
+          ) : (
           <div style={{
-            maxWidth: 800,
+            maxWidth: SETTINGS_MAX_WIDTH_PX,
             width: '100%'
           }}>
             <section style={{ marginBottom: 48 }}>
               <h2 style={{
                 fontSize: 24,
                 fontWeight: 600,
-                color: '#2c2c2c',
+                color: 'var(--color-text-primary)',
                 marginBottom: 16,
                 fontFamily: 'Georgia, "Times New Roman", serif'
               }}>
                 {t('nav.settings')}
               </h2>
               <div style={{
-                background: 'rgba(255, 255, 255, 0.5)',
-                border: '1px solid #d0c4b0',
+                background: 'var(--color-bg-surface)',
+                border: '1px solid var(--color-border-paper)',
                 borderRadius: 8,
                 padding: 24
               }}>
@@ -1624,7 +1963,7 @@ export default function App() {
                   <label style={{
                     fontSize: 14,
                     fontWeight: 500,
-                    color: '#2c2c2c',
+                    color: 'var(--color-text-primary)',
                     marginBottom: 6,
                     display: 'block',
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
@@ -1634,7 +1973,7 @@ export default function App() {
                   <p style={{
                     margin: 0,
                     fontSize: 13,
-                    color: '#666',
+                    color: 'var(--color-text-secondary)',
                     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                   }}>
                     {t('settings.language.description')}
@@ -1650,15 +1989,15 @@ export default function App() {
                         onClick={() => handleUILanguageChange(code)}
                         style={{
                           padding: '8px 16px',
-                          background: isActive ? '#2c2c2c' : 'transparent',
-                          color: isActive ? '#fff' : '#666',
-                          border: isActive ? 'none' : '1px solid #d0c4b0',
+                          background: isActive ? 'var(--color-text-primary)' : 'transparent',
+                          color: isActive ? 'var(--color-text-on-action)' : 'var(--color-text-secondary)',
+                          border: isActive ? 'none' : '1px solid var(--color-border-paper)',
                           borderRadius: 6,
                           fontSize: 14,
                           fontWeight: 500,
                           cursor: isActive ? 'default' : 'pointer',
                           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                          boxShadow: isActive ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+                          boxShadow: isActive ? '0 2px 8px var(--color-shadow-medium)' : 'none',
                           transition: 'all 0.2s ease'
                         }}
                       >
@@ -1671,7 +2010,7 @@ export default function App() {
                 <p style={{
                   marginTop: 12,
                   fontSize: 12,
-                  color: '#8a7a69',
+                  color: 'var(--color-text-muted)',
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}>
                   {t('settings.language.preview')}
@@ -1680,7 +2019,7 @@ export default function App() {
                 <div style={{
                   marginTop: 20,
                   paddingTop: 16,
-                  borderTop: '1px dashed #d0c4b0'
+                  borderTop: '1px dashed var(--color-border-paper)'
                 }}>
                   <div style={{
                     display: 'flex',
@@ -1692,7 +2031,7 @@ export default function App() {
                       <div style={{
                         fontSize: 14,
                         fontWeight: 500,
-                        color: '#2c2c2c',
+                        color: 'var(--color-text-primary)',
                         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                       }}>
                         Energy Bar / 能量条
@@ -1700,7 +2039,7 @@ export default function App() {
                       <div style={{
                         marginTop: 6,
                         fontSize: 12,
-                        color: '#666',
+                        color: 'var(--color-text-secondary)',
                         fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                       }}>
                         Toggle the energy progress bar in the bottom stats line.
@@ -1714,8 +2053,8 @@ export default function App() {
                         width: 44,
                         height: 24,
                         borderRadius: 999,
-                        border: showEnergyBar ? '1px solid #2c2c2c' : '1px solid #d0c4b0',
-                        background: showEnergyBar ? '#2c2c2c' : 'transparent',
+                        border: showEnergyBar ? '1px solid var(--color-text-primary)' : '1px solid var(--color-border-paper)',
+                        background: showEnergyBar ? 'var(--color-text-primary)' : 'transparent',
                         cursor: 'pointer',
                         position: 'relative',
                         padding: 0,
@@ -1730,7 +2069,7 @@ export default function App() {
                         width: 16,
                         height: 16,
                         borderRadius: '50%',
-                        background: showEnergyBar ? '#fff' : '#8a7a69',
+                        background: showEnergyBar ? 'var(--color-text-on-action)' : 'var(--color-text-muted)',
                         transition: 'all 0.2s ease'
                       }} />
                     </button>
@@ -1739,9 +2078,40 @@ export default function App() {
               </div>
             </section>
 
+            {/* Resource Connector Settings */}
+            <section style={{ marginBottom: 48 }}>
+              <ConnectorSettingsSection
+                focusNonce={connectorSettingsFocusNonce}
+                isMobile={isMobile}
+                onOpenNotionDetail={openNotionConnectorDetail}
+              />
+            </section>
+
+            {/* AI Model Configuration */}
+            <section style={{ marginBottom: 48 }}>
+              <h2 style={{
+                fontSize: 24,
+                fontWeight: 600,
+                color: 'var(--color-text-primary)',
+                marginBottom: 16,
+                fontFamily: 'Georgia, "Times New Roman", serif'
+              }}>
+                AI 模型配置
+              </h2>
+              <div style={{
+                background: 'var(--color-bg-surface)',
+                border: '1px solid var(--color-border-paper)',
+                borderRadius: 8,
+                padding: 24
+              }}>
+                <ModelConfigSection />
+              </div>
+            </section>
+
             {/* About Content */}
             <AboutView />
           </div>
+          )}
         </div>
       )}
       {/* @@@ Always render timeline to pre-load data and position scroll */}
@@ -1751,7 +2121,7 @@ export default function App() {
         left: 0,
         right: 0,
         bottom: mobileBottomOffset,
-        background: '#f8f0e6',
+        background: 'var(--color-bg-app)',
         display: currentView === 'timeline' ? 'flex' : 'none',
         overflow: 'hidden'
       }}>
@@ -1768,11 +2138,35 @@ export default function App() {
           left: 0,
           right: 0,
           bottom: mobileBottomOffset,
-          background: '#f8f0e6',
+          background: 'var(--color-bg-app)',
           display: 'flex',
           overflow: 'hidden'
         }}>
           <AnalysisView />
+        </div>
+      )}
+
+      {shouldRenderChatView && (
+        <div style={{
+          position: 'fixed',
+          top: viewTopOffset,
+          left: 0,
+          right: 0,
+          bottom: mobileBottomOffset,
+          display: currentView === 'chat' ? 'flex' : 'none',
+          minHeight: 0,
+          minWidth: 0,
+          overflow: 'hidden'
+        }}>
+          <ChatView
+            editorState={state ? (state as unknown as Record<string, unknown>) : null}
+            onEditorWriteConfirmed={handleEditorWriteConfirmed}
+            requestedThreadId={requestedChatThreadId}
+            activeVoice={activeChatVoice}
+            isMobile={isMobile}
+            landingTab={chatLandingTab}
+            onOpenConnectorSettings={openConnectorSettings}
+          />
         </div>
       )}
 
@@ -1784,8 +2178,8 @@ export default function App() {
           bottom: 0,
           height: `calc(${mobileNavHeight}px + env(safe-area-inset-bottom, 0px))`,
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-          background: '#f8f0e6',
-          borderTop: '1px solid #d0c4b0',
+          background: 'var(--color-bg-app)',
+          borderTop: '1px solid var(--color-border-paper)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-around',
@@ -1797,7 +2191,7 @@ export default function App() {
             return (
               <button
                 key={item.key}
-                onClick={() => setCurrentView(item.key)}
+                onClick={() => handleAppViewChange(item.key)}
                 aria-pressed={isActive}
                 style={{
                   flex: 1,
@@ -1809,7 +2203,7 @@ export default function App() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: 4,
-                  color: isActive ? '#2c2c2c' : '#8a7a69',
+                  color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-muted)',
                   fontSize: 11,
                   fontWeight: isActive ? 600 : 400,
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
@@ -1839,8 +2233,8 @@ export default function App() {
           zIndex: 1000
         }}>
           <div style={{
-            backgroundColor: '#fffef9',
-            border: '2px solid #d0c4b0',
+            backgroundColor: 'var(--color-bg-paper)',
+            border: '2px solid var(--color-border-paper)',
             borderRadius: '8px',
             padding: '32px',
             maxWidth: '400px',
@@ -1850,7 +2244,7 @@ export default function App() {
             <h2 style={{
               margin: '0 0 16px 0',
               fontSize: '20px',
-              color: '#333',
+              color: 'var(--color-text-body)',
               fontWeight: 600
             }}>
               Start Fresh?
@@ -1859,7 +2253,7 @@ export default function App() {
               margin: '0 0 24px 0',
               fontSize: '16px',
               lineHeight: '1.6',
-              color: '#555'
+              color: 'var(--color-text-secondary)'
             }}>
               This will delete all your current writing and comments. This action cannot be undone.
             </p>
@@ -1872,21 +2266,21 @@ export default function App() {
                 onClick={handleConfirmStartFresh}
                 style={{
                   padding: '8px 20px',
-                  border: '1px solid #d44',
-                  background: '#d44',
+                  border: '1px solid var(--color-state-danger)',
+                  background: 'var(--color-state-danger)',
                   borderRadius: '4px',
                   cursor: 'pointer',
                   fontSize: '15px',
                   fontFamily: "'Excalifont', 'Xiaolai', 'Georgia', serif",
-                  color: '#fff',
+                  color: 'var(--color-text-on-action)',
                   fontWeight: 600,
                   transition: 'all 0.2s'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#c33';
+                  e.currentTarget.style.backgroundColor = 'var(--color-state-danger-hover)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#d44';
+                  e.currentTarget.style.backgroundColor = 'var(--color-state-danger)';
                 }}
               >
                 Delete All
@@ -1895,20 +2289,20 @@ export default function App() {
                 onClick={() => setShowWarning(false)}
                 style={{
                   padding: '8px 20px',
-                  border: '1px solid #d0c4b0',
-                  background: '#fff',
+                  border: '1px solid var(--color-border-paper)',
+                  background: 'var(--color-bg-surface-solid)',
                   borderRadius: '4px',
                   cursor: 'pointer',
                   fontSize: '15px',
                   fontFamily: "'Excalifont', 'Xiaolai', 'Georgia', serif",
-                  color: '#333',
+                  color: 'var(--color-text-body)',
                   transition: 'all 0.2s'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f5f5f5';
+                  e.currentTarget.style.backgroundColor = 'var(--color-bg-hover)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = '#fff';
+                  e.currentTarget.style.backgroundColor = 'var(--color-bg-surface-solid)';
                 }}
               >
                 Cancel

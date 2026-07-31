@@ -1,9 +1,23 @@
+// [Input] Consume backend REST/SSE endpoints, auth token storage, language storage, and session/deck request data.
+// [Output] Provide frontend API helpers for sessions, decks, voices, Claude Agent SSE calls, analysis reports,
+//          Reflections section analysis, and Reflections section config (GET/PUT/DELETE).
+// [Pos] voice-api client node in frontend/src/api
+// [Sync] 2026-06-06: remove Voice scenario memory workspace initialization (initializeMemoryWorkspace removed).
+// [Sync] 2026-06-06: add ReflectionSectionConfig type + getReflectionsSectionConfig /
+//         saveReflectionsSectionConfig / resetReflectionsSectionConfig API helpers for
+//         frontend prompt-file editing (GET/PUT/DELETE /api/reflections/config/{section}).
+// [Sync] 2026-06-12: consume centralized runtime API_BASE for cross-origin deployments.
+// [Sync] 2026-06-25: Reflections analysis now uses backend Reflections-agent tasks:
+//         POST task(auto_start=false) → subscribe SSE → POST start → stream events → fetch results.
 /**
  * API client for voice analysis backend - FastAPI sync API version
+ * [Sync] 2026-06-01: normalize user_sessions.labels in session API responses for frontend display.
+ * [Sync] 2026-06-25: analyzeEchoes/analyzeTraits/analyzePatterns now use backend
+ *         Reflections-agent async tasks with SSE-first start control.
  */
 
 import { STORAGE_KEYS } from '../constants/storageKeys';
-import { LANGUAGE_STORAGE_KEY } from '../i18n';
+import { API_BASE } from '../lib/apiBase';
 
 // ========== Inline Types (workaround for Vite bug) ==========
 export interface VoiceConfig {
@@ -12,6 +26,8 @@ export interface VoiceConfig {
   enabled: boolean;
   icon: string;
   color: string;
+  thread_id?: string;
+  memory_workspace_config?: Record<string, unknown>;
 }
 
 export interface UserState {
@@ -23,6 +39,20 @@ export interface StateConfig {
   greeting: string;
   states: Record<string, UserState>;
 }
+
+export type SessionLabels = string[];
+
+export interface UserSession {
+  id: string;
+  name?: string | null;
+  labels: SessionLabels;
+  editor_state?: any;
+  created_at: string;
+  updated_at: string;
+  date_key?: string | null;
+  first_line?: string;
+}
+
 export interface Voice {
   id: string;
   deck_id: string;
@@ -37,6 +67,8 @@ export interface Voice {
   owner_id?: number;
   enabled: boolean;
   order_index?: number;
+  thread_id?: string;
+  memory_workspace_config?: Record<string, unknown>;
   created_at?: string;
   updated_at?: string;
 }
@@ -65,12 +97,19 @@ export interface Deck {
   install_count?: number;
 }
 
-// nginx proxies /ink-and-memory/api/* to backend (8765)
-const API_BASE = '/ink-and-memory';
+export function normalizeSessionLabels(labels: unknown): SessionLabels {
+  if (!Array.isArray(labels)) return [];
 
-function getUILanguage(): 'en' | 'zh' {
-  const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
-  return stored === 'zh' ? 'zh' : 'en';
+  return labels
+    .map(label => String(label).trim())
+    .filter(label => label.length > 0);
+}
+
+function normalizeUserSession(session: any): UserSession {
+  return {
+    ...session,
+    labels: normalizeSessionLabels(session?.labels)
+  };
 }
 
 /**
@@ -86,6 +125,7 @@ function getAuthHeaders(): HeadersInit {
     'Authorization': `Bearer ${token}`
   };
 }
+
 
 /**
  * Get default voices from backend
@@ -172,6 +212,123 @@ export async function analyzeText(
 }
 
 /**
+ * Chat with a voice via Claude-agent SSE streaming.
+ * Calls POST /api/claude-agent with the voice's thread_id and system prompt.
+ * Fires onDelta for each text-delta chunk, onComplete with full text, onError on failure.
+ */
+export async function chatWithVoiceSSE({
+  threadId,
+  message,
+  systemPrompt,
+  editorState,
+  onDelta,
+  onReasoningDelta,
+  onReasoningEnd,
+  onComplete,
+  onError,
+}: {
+  threadId: string;
+  message: string;
+  systemPrompt: string;
+  /** Current EditorState snapshot forwarded to the backend agent runner as editor_state. */
+  editorState?: Record<string, unknown> | null;
+  onDelta: (delta: string) => void;
+  /** Called for each incremental reasoning/thinking chunk. */
+  onReasoningDelta?: (delta: string) => void;
+  /** Called once when the reasoning block finishes (reasoning-end received). */
+  onReasoningEnd?: () => void;
+  /** Called with (fullResponseText, fullReasoningText) when the stream completes. */
+  onComplete: (fullText: string, reasoning?: string) => void;
+  onError: (error: Error) => void;
+}): Promise<void> {
+  const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}/api/claude-agent`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        id: threadId,
+        resume: true,
+        message: {
+          id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
+          role: 'user',
+          parts: [{ type: 'text', text: message }],
+        },
+        chatModel: { provider: 'anthropic', model: 'claude-sonnet-4-20250514' },
+        toolChoice: 'auto',
+        allowedAppDefaultToolkit: [],
+        allowedMcpServers: {},
+        attachments: [],
+        systemPrompt,
+        ...(editorState != null ? { editor_state: editorState } : {}),
+      }),
+    });
+  } catch (err) {
+    onError(err instanceof Error ? err : new Error(String(err)));
+    return;
+  }
+
+  if (!response.ok || !response.body) {
+    onError(new Error(`Claude-agent request failed: ${response.status}`));
+    return;
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let accumulated = '';
+  let accumulatedReasoning = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const frames = buffer.split(/\n\n+/);
+      buffer = frames.pop() ?? '';
+
+      for (const frame of frames) {
+        for (const line of frame.split('\n')) {
+          if (!line.startsWith('data: ')) continue;
+          const json = line.slice('data: '.length).trim();
+          if (!json) continue;
+          let evt: { type: string; delta?: string; errorText?: string };
+          try {
+            evt = JSON.parse(json);
+          } catch {
+            continue;
+          }
+          if (evt.type === 'text-delta' && typeof evt.delta === 'string') {
+            accumulated += evt.delta;
+            onDelta(evt.delta);
+          } else if (evt.type === 'reasoning-delta' && typeof evt.delta === 'string') {
+            accumulatedReasoning += evt.delta;
+            onReasoningDelta?.(evt.delta);
+          } else if (evt.type === 'reasoning-end') {
+            onReasoningEnd?.();
+          } else if (evt.type === 'error') {
+            onError(new Error(evt.errorText ?? 'Claude-agent error'));
+            return;
+          } else if (evt.type === 'finish') {
+            onComplete(accumulated, accumulatedReasoning || undefined);
+            return;
+          }
+        }
+      }
+    }
+    onComplete(accumulated, accumulatedReasoning || undefined);
+  } catch (err) {
+    onError(err instanceof Error ? err : new Error(String(err)));
+  }
+}
+
+/**
  * Chat with a voice persona (PolyCLI direct call)
  * Backend loads voice config from database using voice_id and user_id from JWT
  */
@@ -214,91 +371,402 @@ export async function chatWithVoice(
   return data.result?.response || 'Sorry, I could not respond.';
 }
 
-/**
- * Analyze echoes (recurring themes) from all notes (PolyCLI direct call)
- */
-export async function analyzeEchoes(): Promise<any[]> {
-  const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-  const language = getUILanguage();
+// ─────────────────────────────────────────────────────────────
+// Reflections section config — read / write / reset
+// ─────────────────────────────────────────────────────────────
 
-  const response = await fetch(`${API_BASE}/polycli/api/trigger-sync`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify({
-      session_id: 'analyze_echoes',
-      params: { language },
-      timeout: 60
-    })
-  });
-
-  const data: SyncResponse = await response.json();
-
-  if (!data.success) {
-    throw new Error(data.error || 'Echoes analysis failed');
-  }
-
-  return data.result?.echoes || [];
+export interface ReflectionSectionConfig {
+  section: string;
+  display_name: string;
+  display_name_zh: string;
+  usedCustomConfig: boolean;
+  prompt_files: Record<string, string>;
 }
 
 /**
- * Analyze traits (personality characteristics) from all notes (PolyCLI direct call)
+ * Fetch the effective section config for the current user.
+ * Returns the user's custom config if set, merged over the static default.
  */
-export async function analyzeTraits(): Promise<any[]> {
+export async function getReflectionsSectionConfig(
+  section: 'echoes' | 'traits' | 'patterns'
+): Promise<ReflectionSectionConfig> {
   const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-  const language = getUILanguage();
+  if (!token) throw new Error('Not authenticated');
 
-  const response = await fetch(`${API_BASE}/polycli/api/trigger-sync`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify({
-      session_id: 'analyze_traits',
-      params: { language },
-      timeout: 60
-    })
+  const res = await fetch(`${API_BASE}/api/reflections/config/${section}`, {
+    headers: { Authorization: `Bearer ${token}` },
   });
-
-  const data: SyncResponse = await response.json();
-
-  if (!data.success) {
-    throw new Error(data.error || 'Traits analysis failed');
-  }
-
-  return data.result?.traits || [];
+  if (!res.ok) throw new Error(`Failed to fetch section config (${res.status})`);
+  return await res.json() as ReflectionSectionConfig;
 }
 
 /**
- * Analyze patterns (behavioral patterns) from all notes (PolyCLI direct call)
+ * Save user's custom prompt files for a section.
+ * Partial updates are supported — only provided filenames are overridden.
  */
-export async function analyzePatterns(): Promise<any[]> {
+export async function saveReflectionsSectionConfig(
+  section: 'echoes' | 'traits' | 'patterns',
+  promptFiles: Record<string, string>
+): Promise<{ saved: boolean; updatedFiles: string[] }> {
   const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
-  const language = getUILanguage();
+  if (!token) throw new Error('Not authenticated');
 
-  const response = await fetch(`${API_BASE}/polycli/api/trigger-sync`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify({
-      session_id: 'analyze_patterns',
-      params: { language },
-      timeout: 60
-    })
+  const res = await fetch(`${API_BASE}/api/reflections/config/${section}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ prompt_files: promptFiles }),
   });
-
-  const data: SyncResponse = await response.json();
-
-  if (!data.success) {
-    throw new Error(data.error || 'Patterns analysis failed');
+  if (!res.ok) {
+    const err = await res.text().catch(() => '');
+    throw new Error(`Failed to save section config (${res.status}): ${err}`);
   }
+  return await res.json();
+}
 
-  return data.result?.patterns || [];
+/**
+ * Reset a section's config back to the static default (removes user customization).
+ */
+export async function resetReflectionsSectionConfig(
+  section: 'echoes' | 'traits' | 'patterns'
+): Promise<void> {
+  const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+  if (!token) throw new Error('Not authenticated');
+
+  const res = await fetch(`${API_BASE}/api/reflections/config/${section}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error(`Failed to reset section config (${res.status})`);
+}
+
+export interface ReflectionResult {
+  id?: string;
+  task_id?: string;
+  section?: 'echoes' | 'traits' | 'patterns';
+  title: string;
+  description: string;
+  related_session_ids: string[];
+  evidence: string;
+  confidence: 'high' | 'medium' | 'low';
+}
+
+export type ReflectionSectionKey = 'echoes' | 'traits' | 'patterns';
+
+export interface ReflectionTask {
+  id: string;
+  task_id: string;
+  status: 'CREATED' | 'ASSEMBLING' | 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'PARTIAL_FAILED' | 'FAILED';
+  sections: ReflectionSectionKey[];
+  input_snapshot: Record<string, unknown>;
+  workspace_path?: string | null;
+  agent_contract_version?: string | null;
+  error_summary?: string | null;
+  created_at?: string;
+  started_at?: string | null;
+  completed_at?: string | null;
+  updated_at?: string;
+  results?: ReflectionResult[];
+}
+
+export interface ReflectionTaskEvent {
+  id: string;
+  task_id: string;
+  type: string;
+  sequence: number;
+  created_at: string;
+  payload: Record<string, unknown>;
+}
+
+export interface RunReflectionsTaskOptions {
+  sections?: ReflectionSectionKey[];
+  sessionIds?: string[];
+  language?: string;
+  onEvent?: (event: ReflectionTaskEvent) => void;
+}
+
+export interface ResumeReflectionsTaskOptions {
+  lastEventId?: string;
+  onEvent?: (event: ReflectionTaskEvent) => void;
+}
+
+function currentFrontendLanguage(): string {
+  return localStorage.getItem(STORAGE_KEYS.LANGUAGE) || 'en';
+}
+
+function authHeaders(extra?: Record<string, string>): HeadersInit {
+  const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+  if (!token) throw new Error('Not authenticated');
+  return { ...(extra ?? {}), Authorization: `Bearer ${token}` };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function normalizeReflectionResult(item: unknown): ReflectionResult {
+  const record = isRecord(item) ? item : {};
+  return {
+    id: typeof record.id === 'string' ? record.id : undefined,
+    task_id: typeof record.task_id === 'string' ? record.task_id : undefined,
+    section: ['echoes', 'traits', 'patterns'].includes(String(record.section))
+      ? record.section as ReflectionSectionKey
+      : undefined,
+    title: String(record.title ?? ''),
+    description: String(record.description ?? ''),
+    related_session_ids: Array.isArray(record.related_session_ids)
+      ? record.related_session_ids.filter((s: unknown): s is string => typeof s === 'string')
+      : [],
+    evidence: String(record.evidence ?? ''),
+    confidence: (['high', 'medium', 'low'].includes(String(record.confidence))
+      ? record.confidence
+      : 'medium') as 'high' | 'medium' | 'low',
+  };
+}
+
+function normalizeReflectionTask(raw: unknown): ReflectionTask {
+  const record = isRecord(raw) ? raw : {};
+  return {
+    id: String(record.id ?? record.task_id ?? ''),
+    task_id: String(record.task_id ?? record.id ?? ''),
+    status: String(record.status ?? 'CREATED') as ReflectionTask['status'],
+    sections: Array.isArray(record.sections)
+      ? record.sections.filter((s: unknown): s is ReflectionSectionKey =>
+          s === 'echoes' || s === 'traits' || s === 'patterns')
+      : [],
+    input_snapshot: isRecord(record.input_snapshot)
+      ? record.input_snapshot
+      : {},
+    workspace_path: typeof record.workspace_path === 'string' ? record.workspace_path : null,
+    agent_contract_version: typeof record.agent_contract_version === 'string' ? record.agent_contract_version : null,
+    error_summary: typeof record.error_summary === 'string' ? record.error_summary : null,
+    created_at: typeof record.created_at === 'string' ? record.created_at : undefined,
+    started_at: typeof record.started_at === 'string' ? record.started_at : null,
+    completed_at: typeof record.completed_at === 'string' ? record.completed_at : null,
+    updated_at: typeof record.updated_at === 'string' ? record.updated_at : undefined,
+    results: Array.isArray(record.results) ? record.results.map(normalizeReflectionResult) : undefined,
+  };
+}
+
+function reflectionResultsBySection(results: ReflectionResult[]): Record<ReflectionSectionKey, ReflectionResult[]> {
+  return {
+    echoes: results.filter(r => r.section === 'echoes'),
+    traits: results.filter(r => r.section === 'traits'),
+    patterns: results.filter(r => r.section === 'patterns'),
+  };
+}
+
+export async function createReflectionTask(
+  sections?: ReflectionSectionKey[],
+  autoStart = true,
+  language = currentFrontendLanguage(),
+  sessionIds?: string[],
+): Promise<ReflectionTask> {
+  const res = await fetch(`${API_BASE}/api/reflections/tasks`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ sections, auto_start: autoStart, language, session_ids: sessionIds }),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Failed to create reflections task (${res.status}): ${text}`);
+  }
+  return normalizeReflectionTask(await res.json());
+}
+
+export async function startReflectionTask(taskId: string): Promise<ReflectionTask> {
+  const res = await fetch(`${API_BASE}/api/reflections/tasks/${taskId}/start`, {
+    method: 'POST',
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Failed to start reflections task (${res.status}): ${text}`);
+  }
+  return normalizeReflectionTask(await res.json());
+}
+
+export async function getReflectionTask(taskId: string): Promise<ReflectionTask> {
+  const res = await fetch(`${API_BASE}/api/reflections/tasks/${taskId}`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(`Failed to fetch reflections task (${res.status})`);
+  return normalizeReflectionTask(await res.json());
+}
+
+export async function getReflectionTaskResults(taskId: string): Promise<ReflectionResult[]> {
+  const res = await fetch(`${API_BASE}/api/reflections/tasks/${taskId}/results`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(`Failed to fetch reflections results (${res.status})`);
+  const data = await res.json() as { results?: unknown[] };
+  return Array.isArray(data.results) ? data.results.map(normalizeReflectionResult) : [];
+}
+
+export async function getLatestReflections(): Promise<{ task: ReflectionTask | null; results: ReflectionResult[] }> {
+  const res = await fetch(`${API_BASE}/api/reflections/latest`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(`Failed to fetch latest reflections (${res.status})`);
+  const data = await res.json() as { task?: unknown; results?: unknown[] };
+  return {
+    task: data.task ? normalizeReflectionTask(data.task) : null,
+    results: Array.isArray(data.results) ? data.results.map(normalizeReflectionResult) : [],
+  };
+}
+
+function parseReflectionSseFrame(frame: string): ReflectionTaskEvent | null {
+  const dataLine = frame.split('\n').find(line => line.startsWith('data: '));
+  if (!dataLine) return null;
+  try {
+    return JSON.parse(dataLine.slice('data: '.length)) as ReflectionTaskEvent;
+  } catch {
+    return null;
+  }
+}
+
+async function streamReflectionTaskEvents(
+  taskId: string,
+  onEvent?: (event: ReflectionTaskEvent) => void,
+  onConnected?: () => Promise<void> | void,
+  lastEventId?: string,
+): Promise<void> {
+  const headers = authHeaders({ Accept: 'text/event-stream' });
+  if (lastEventId) {
+    (headers as Record<string, string>)['Last-Event-ID'] = lastEventId;
+  }
+  const res = await fetch(`${API_BASE}/api/reflections/tasks/${taskId}/events`, {
+    headers,
+  });
+  if (!res.ok || !res.body) return;
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let connected = false;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const frames = buffer.split('\n\n');
+    buffer = frames.pop() ?? '';
+    for (const frame of frames) {
+      const event = parseReflectionSseFrame(frame);
+      if (event?.type === 'reflection.stream.connected' && !connected) {
+        connected = true;
+        await onConnected?.();
+      }
+      if (event) onEvent?.(event);
+    }
+  }
+  if (!connected) await onConnected?.();
+}
+
+async function waitForReflectionTaskResults(
+  taskId: string,
+  onEvent?: (event: ReflectionTaskEvent) => void,
+  onConnected?: () => Promise<void> | void,
+  lastEventId?: string,
+): Promise<ReflectionResult[]> {
+  let connectionStarted = false;
+  const connectOnce = async () => {
+    if (connectionStarted) return;
+    connectionStarted = true;
+    await onConnected?.();
+  };
+  const startAfterSseGracePeriod = window.setTimeout(() => {
+    void connectOnce();
+  }, 1200);
+  await streamReflectionTaskEvents(taskId, onEvent, connectOnce, lastEventId).catch(async err => {
+    console.warn('[Reflections] SSE stream failed, falling back to polling:', err);
+    await connectOnce();
+  });
+  await connectOnce();
+  window.clearTimeout(startAfterSseGracePeriod);
+
+  for (let i = 0; i < 30; i += 1) {
+    const task = await getReflectionTask(taskId);
+    if (['COMPLETED', 'PARTIAL_FAILED', 'FAILED'].includes(task.status)) {
+      if (task.status === 'FAILED') {
+        throw new Error(task.error_summary || 'Reflections task failed');
+      }
+      return task.results ?? await getReflectionTaskResults(taskId);
+    }
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  throw new Error('Reflections task did not finish in time');
+}
+
+export async function runReflectionsTask(
+  options: RunReflectionsTaskOptions = {},
+): Promise<Record<ReflectionSectionKey, ReflectionResult[]>> {
+  const task = await createReflectionTask(options.sections, false, options.language ?? currentFrontendLanguage(), options.sessionIds);
+  options.onEvent?.({
+    id: 'client-task-created',
+    task_id: task.task_id,
+    type: 'reflection.client.task.created',
+    sequence: 0,
+    created_at: new Date().toISOString(),
+    payload: { sections: task.sections },
+  });
+  let started = false;
+  const startOnce = async () => {
+    if (started) return;
+    started = true;
+    await startReflectionTask(task.task_id);
+  };
+  const results = await waitForReflectionTaskResults(task.task_id, options.onEvent, startOnce);
+  return reflectionResultsBySection(results);
+}
+
+export async function resumeReflectionsTask(
+  taskId: string,
+  options: ResumeReflectionsTaskOptions = {},
+): Promise<Record<ReflectionSectionKey, ReflectionResult[]>> {
+  const task = await getReflectionTask(taskId);
+  if (task.status === 'FAILED') {
+    throw new Error(task.error_summary || 'Reflections task failed');
+  }
+  const results = ['COMPLETED', 'PARTIAL_FAILED'].includes(task.status)
+    ? task.results ?? await getReflectionTaskResults(taskId)
+    : await waitForReflectionTaskResults(taskId, options.onEvent, undefined, options.lastEventId);
+  return reflectionResultsBySection(results);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Public analysis functions — backend Reflections-agent async tasks
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Analyze echoes (recurring themes) via backend Reflections-agent task.
+ */
+export async function analyzeEchoes(onDelta?: (d: string) => void): Promise<ReflectionResult[]> {
+  const bySection = await runReflectionsTask({
+    sections: ['echoes'],
+    onEvent: event => onDelta?.(event.type),
+  });
+  return bySection.echoes;
+}
+
+/**
+ * Analyze traits (personality characteristics) via backend Reflections-agent task.
+ */
+export async function analyzeTraits(onDelta?: (d: string) => void): Promise<ReflectionResult[]> {
+  const bySection = await runReflectionsTask({
+    sections: ['traits'],
+    onEvent: event => onDelta?.(event.type),
+  });
+  return bySection.traits;
+}
+
+/**
+ * Analyze patterns (behavioral patterns) via backend Reflections-agent task.
+ */
+export async function analyzePatterns(onDelta?: (d: string) => void): Promise<ReflectionResult[]> {
+  const bySection = await runReflectionsTask({
+    sections: ['patterns'],
+    onEvent: event => onDelta?.(event.type),
+  });
+  return bySection.patterns;
 }
 
 /**
@@ -412,7 +880,7 @@ type SessionRangeOptions = {
 /**
  * List sessions metadata, optionally scoped to a date range.
  */
-export async function listSessions(timezone?: string, options: SessionRangeOptions = {}): Promise<any[]> {
+export async function listSessions(timezone?: string, options: SessionRangeOptions = {}): Promise<UserSession[]> {
   const params = new URLSearchParams();
   if (timezone) params.append('timezone', timezone);
   if (options.startDate) params.append('start_date', options.startDate);
@@ -430,7 +898,7 @@ export async function listSessions(timezone?: string, options: SessionRangeOptio
   }
 
   const data = await response.json();
-  return data.sessions;
+  return (data.sessions || []).map(normalizeUserSession);
 }
 
 export async function fetchSessionsAggregate(timezone: string): Promise<{
@@ -453,7 +921,7 @@ export async function fetchSessionsAggregate(timezone: string): Promise<{
 /**
  * Get a specific session
  */
-export async function getSession(sessionId: string): Promise<any> {
+export async function getSession(sessionId: string): Promise<UserSession> {
   const response = await fetch(`${API_BASE}/api/sessions/${sessionId}`, {
     headers: getAuthHeaders()
   });
@@ -463,13 +931,13 @@ export async function getSession(sessionId: string): Promise<any> {
     throw new Error(error.detail || 'Get session failed');
   }
 
-  return await response.json();
+  return normalizeUserSession(await response.json());
 }
 
 /**
  * Fetch multiple sessions (with editor_state) in a single request.
  */
-export async function getSessionsBatch(sessionIds: string[]): Promise<any[]> {
+export async function getSessionsBatch(sessionIds: string[]): Promise<UserSession[]> {
   if (!sessionIds || sessionIds.length === 0) return [];
 
   const response = await fetch(`${API_BASE}/api/sessions/batch`, {
@@ -484,7 +952,7 @@ export async function getSessionsBatch(sessionIds: string[]): Promise<any[]> {
   }
 
   const data = await response.json();
-  return data.sessions;
+  return (data.sessions || []).map(normalizeUserSession);
 }
 
 /**
@@ -910,6 +1378,7 @@ export async function updateVoice(voiceId: string, data: {
   color?: string;
   enabled?: boolean;
   order_index?: number;
+  thread_id?: string;
 }): Promise<void> {
   const response = await fetch(`${API_BASE}/api/voices/${voiceId}`, {
     method: 'PUT',
@@ -921,6 +1390,37 @@ export async function updateVoice(voiceId: string, data: {
     const error = await response.json();
     throw new Error(error.detail || 'Update voice failed');
   }
+}
+
+/**
+ * Create a Claude-agent thread and associate it with a voice (lazy).
+ * If the voice already has a thread_id, returns it unchanged.
+ * Otherwise creates a new thread, persists it on the voice, and returns the id.
+ */
+export async function ensureVoiceThread(voiceId: string, existingThreadId?: string): Promise<string> {
+  if (existingThreadId) {
+    return existingThreadId;
+  }
+
+  const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+  if (!token) throw new Error('Not authenticated');
+
+  // Create a new Claude-agent thread
+  const res = await fetch(`${API_BASE}/api/claude-agent/threads`, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token }
+  });
+  if (!res.ok) throw new Error('Failed to create Claude-agent thread');
+  const { thread_id } = await res.json() as { thread_id: string };
+
+  // Persist the association on the voice (best-effort; non-system voices only)
+  try {
+    await updateVoice(voiceId, { thread_id });
+  } catch {
+    // Ignore if voice update fails (e.g. system voice) - thread_id is still usable
+  }
+
+  return thread_id;
 }
 
 /**
@@ -985,7 +1485,9 @@ export async function loadVoicesFromDecks(): Promise<Record<string, VoiceConfig>
               systemPrompt: voice.system_prompt,
               enabled: voice.enabled,
               icon: voice.icon,
-              color: voice.color
+              color: voice.color,
+              thread_id: voice.thread_id,
+              memory_workspace_config: voice.memory_workspace_config
             };
           }
         }

@@ -1,0 +1,8 @@
+{
+  "name": "ink-and-memory-frontend",
+  "compatibility_date": "2026-07-31",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}

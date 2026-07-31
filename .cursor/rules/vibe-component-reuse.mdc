@@ -1,0 +1,30 @@
+---
+name: vibe-component-reuse
+description: Prefer reuse of existing components/modules over introducing new implementations.
+alwaysApply: true
+globs:
+  - "**/*.py"
+  - "**/*.js"
+  - "**/*.jsx"
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.go"
+  - "**/*.rs"
+  - "**/*.java"
+---
+
+# Vibe Component Reuse Rules
+
+## Reuse First
+- Before adding a new component/module/page/script, search existing implementation first.
+- If an existing unit can satisfy >=70% semantics, extend or reuse it.
+- Avoid parallel implementations that overlap in behavior.
+
+## New Creation Gate
+- Create a new component/module only when reuse is clearly not viable.
+- Document why reuse is not possible in the nearest folder doc.
+- Keep new units single-purpose and composable.
+
+## Refactor Preference
+- When requirements change, prefer refactoring current modules over spawning alternates.
+- Remove dead/duplicate paths after migration to prevent overlap drift.

@@ -1,0 +1,40 @@
+---
+name: vibe-doc-sync
+description: Enforce root/folder/file documentation sync contracts and semantic Input->Pos linking.
+alwaysApply: true
+globs:
+  - "**/*.md"
+  - "**/*.py"
+  - "**/*.sh"
+  - "**/*.js"
+  - "**/*.jsx"
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.go"
+  - "**/*.rs"
+  - "**/*.java"
+---
+
+# Vibe Doc Sync Rules
+
+## Root Contract
+- Root `CLAUDE.md` is pointer-only and must include update contract.
+- Any functional, architectural, or coding-style change must update related child docs before session end.
+
+## Folder Contract
+- Every scanned folder must have `.folder.md` (including empty folders).
+- Keep architecture summary within 3 lines.
+- Maintain file table with `File | Pos | Function`.
+- Folder changed => update the same folder's `.folder.md`.
+
+## File Header Contract
+- Every supported source file must keep header lines:
+  - `[Input]`
+  - `[Output]`
+  - `[Pos]`
+  - `[Sync]`
+- File changed => update header and owner `.folder.md`.
+
+## Semantic Link Network
+- In `[Input]`, prefer direct references to dependency file paths and their `[Pos]`.
+- Import-resolution fallback is owner `.folder.md` contract path.

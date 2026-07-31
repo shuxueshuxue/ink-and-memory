@@ -156,7 +156,7 @@ export default function FriendsView({ isVisible, onViewFriendTimeline }: Props) 
       display: 'flex',
       flexDirection: 'column',
       fontFamily: "'Excalifont', 'Xiaolai', 'Georgia', serif",
-      background: '#f8f0e6',
+      background: 'var(--color-bg-app)',
       overflow: 'hidden'
     }}>
       {/* Tab Navigation */}
@@ -164,7 +164,7 @@ export default function FriendsView({ isVisible, onViewFriendTimeline }: Props) 
         display: 'flex',
         gap: 16,
         padding: '24px 32px 0',
-        borderBottom: '1px solid #d0c4b0'
+        borderBottom: '1px solid var(--color-border-paper)'
       }}>
         <button
           onClick={() => setActiveTab('friends')}
@@ -175,8 +175,8 @@ export default function FriendsView({ isVisible, onViewFriendTimeline }: Props) 
             fontSize: 15,
             fontWeight: activeTab === 'friends' ? 600 : 400,
             cursor: 'pointer',
-            color: activeTab === 'friends' ? '#2c2c2c' : '#888',
-            borderBottom: activeTab === 'friends' ? '3px solid #2c2c2c' : '3px solid transparent',
+            color: activeTab === 'friends' ? 'var(--color-text-primary)' : '#888',
+            borderBottom: activeTab === 'friends' ? '3px solid var(--color-text-primary)' : '3px solid transparent',
             transition: 'all 0.2s'
           }}
         >
@@ -191,8 +191,8 @@ export default function FriendsView({ isVisible, onViewFriendTimeline }: Props) 
             fontSize: 15,
             fontWeight: activeTab === 'requests' ? 600 : 400,
             cursor: 'pointer',
-            color: activeTab === 'requests' ? '#2c2c2c' : '#888',
-            borderBottom: activeTab === 'requests' ? '3px solid #2c2c2c' : '3px solid transparent',
+            color: activeTab === 'requests' ? 'var(--color-text-primary)' : '#888',
+            borderBottom: activeTab === 'requests' ? '3px solid var(--color-text-primary)' : '3px solid transparent',
             transition: 'all 0.2s'
           }}
         >
@@ -207,8 +207,8 @@ export default function FriendsView({ isVisible, onViewFriendTimeline }: Props) 
             fontSize: 15,
             fontWeight: activeTab === 'invite' ? 600 : 400,
             cursor: 'pointer',
-            color: activeTab === 'invite' ? '#2c2c2c' : '#888',
-            borderBottom: activeTab === 'invite' ? '3px solid #2c2c2c' : '3px solid transparent',
+            color: activeTab === 'invite' ? 'var(--color-text-primary)' : '#888',
+            borderBottom: activeTab === 'invite' ? '3px solid var(--color-text-primary)' : '3px solid transparent',
             transition: 'all 0.2s'
           }}
         >
@@ -249,7 +249,7 @@ export default function FriendsView({ isVisible, onViewFriendTimeline }: Props) 
                     key={friend.friend_id ?? friend.id ?? ('friend-' + (friend.friend_email ?? 'unknown'))}
                     style={{
                     background: '#fff',
-                    border: '1px solid #d0c4b0',
+                    border: '1px solid var(--color-border-paper)',
                     borderRadius: 8,
                     padding: 20,
                     display: 'flex',
@@ -260,7 +260,7 @@ export default function FriendsView({ isVisible, onViewFriendTimeline }: Props) 
                       width: 48,
                       height: 48,
                       borderRadius: 24,
-                      background: '#4CAF50',
+                      background: 'var(--color-state-success)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -274,7 +274,7 @@ export default function FriendsView({ isVisible, onViewFriendTimeline }: Props) 
                       <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>
                         {friend.friend_name}
                       </div>
-                      <div style={{ fontSize: 13, color: '#666' }}>
+                      <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
                         {friend.friend_email}
                       </div>
                     </div>
@@ -282,7 +282,7 @@ export default function FriendsView({ isVisible, onViewFriendTimeline }: Props) 
                       onClick={() => onViewFriendTimeline?.(friend.friend_id, friend.friend_name)}
                       style={{
                         padding: '8px 16px',
-                        background: '#4CAF50',
+                        background: 'var(--color-state-success)',
                         color: '#fff',
                         border: 'none',
                         borderRadius: 6,
@@ -292,7 +292,7 @@ export default function FriendsView({ isVisible, onViewFriendTimeline }: Props) 
                         transition: 'background 0.2s'
                       }}
                       onMouseEnter={e => e.currentTarget.style.background = '#45a049'}
-                      onMouseLeave={e => e.currentTarget.style.background = '#4CAF50'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'var(--color-state-success)'}
                     >
                       {t('friends.viewTimeline') || 'View Timeline'}
                     </button>
@@ -300,7 +300,7 @@ export default function FriendsView({ isVisible, onViewFriendTimeline }: Props) 
                       onClick={() => handleRemoveFriend(friend.friend_id)}
                       style={{
                         padding: '8px 16px',
-                        background: '#f44336',
+                        background: 'var(--color-state-error)',
                         color: '#fff',
                         border: 'none',
                         borderRadius: 6,
@@ -310,7 +310,7 @@ export default function FriendsView({ isVisible, onViewFriendTimeline }: Props) 
                         transition: 'background 0.2s'
                       }}
                       onMouseEnter={e => e.currentTarget.style.background = '#da190b'}
-                      onMouseLeave={e => e.currentTarget.style.background = '#f44336'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'var(--color-state-error)'}
                     >
                       {t('friends.remove') || 'Remove'}
                     </button>
@@ -348,7 +348,7 @@ export default function FriendsView({ isVisible, onViewFriendTimeline }: Props) 
                     key={request.id ?? ('request-' + (request.requester_email ?? 'unknown'))}
                     style={{
                     background: '#fff',
-                    border: '1px solid #d0c4b0',
+                    border: '1px solid var(--color-border-paper)',
                     borderRadius: 8,
                     padding: 20,
                     display: 'flex',
@@ -373,7 +373,7 @@ export default function FriendsView({ isVisible, onViewFriendTimeline }: Props) 
                       <div style={{ fontWeight: 600, fontSize: 16, marginBottom: 4 }}>
                         {request.requester_name}
                       </div>
-                      <div style={{ fontSize: 13, color: '#666' }}>
+                      <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
                         {request.requester_email}
                       </div>
                     </div>
@@ -381,7 +381,7 @@ export default function FriendsView({ isVisible, onViewFriendTimeline }: Props) 
                       onClick={() => handleAcceptRequest(request.id)}
                       style={{
                         padding: '8px 16px',
-                        background: '#4CAF50',
+                        background: 'var(--color-state-success)',
                         color: '#fff',
                         border: 'none',
                         borderRadius: 6,
@@ -391,7 +391,7 @@ export default function FriendsView({ isVisible, onViewFriendTimeline }: Props) 
                         transition: 'background 0.2s'
                       }}
                       onMouseEnter={e => e.currentTarget.style.background = '#45a049'}
-                      onMouseLeave={e => e.currentTarget.style.background = '#4CAF50'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'var(--color-state-success)'}
                     >
                       {t('friends.accept') || 'Accept'}
                     </button>
@@ -399,7 +399,7 @@ export default function FriendsView({ isVisible, onViewFriendTimeline }: Props) 
                       onClick={() => handleRejectRequest(request.id)}
                       style={{
                         padding: '8px 16px',
-                        background: '#f44336',
+                        background: 'var(--color-state-error)',
                         color: '#fff',
                         border: 'none',
                         borderRadius: 6,
@@ -409,7 +409,7 @@ export default function FriendsView({ isVisible, onViewFriendTimeline }: Props) 
                         transition: 'background 0.2s'
                       }}
                       onMouseEnter={e => e.currentTarget.style.background = '#da190b'}
-                      onMouseLeave={e => e.currentTarget.style.background = '#f44336'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'var(--color-state-error)'}
                     >
                       {t('friends.reject') || 'Reject'}
                     </button>
@@ -430,7 +430,7 @@ export default function FriendsView({ isVisible, onViewFriendTimeline }: Props) 
             {/* Generate Invite Code */}
             <div style={{
               background: '#fff',
-              border: '1px solid #d0c4b0',
+              border: '1px solid var(--color-border-paper)',
               borderRadius: 8,
               padding: 24,
               marginBottom: 32
@@ -438,7 +438,7 @@ export default function FriendsView({ isVisible, onViewFriendTimeline }: Props) 
               <h3 style={{ fontSize: 18, marginBottom: 12, fontWeight: 600 }}>
                 {t('friends.generateInvite') || 'Generate Invite Code'}
               </h3>
-              <p style={{ fontSize: 14, color: '#666', marginBottom: 16 }}>
+              <p style={{ fontSize: 14, color: 'var(--color-text-secondary)', marginBottom: 16 }}>
                 {t('friends.generateHint') || 'Share this code with someone to let them send you a friend request. Code expires in 7 days.'}
               </p>
 
@@ -489,7 +489,7 @@ export default function FriendsView({ isVisible, onViewFriendTimeline }: Props) 
                   disabled={generatingInvite}
                   style={{
                     padding: '12px 24px',
-                    background: generatingInvite ? '#ccc' : '#4CAF50',
+                    background: generatingInvite ? '#ccc' : 'var(--color-state-success)',
                     color: '#fff',
                     border: 'none',
                     borderRadius: 6,
@@ -506,14 +506,14 @@ export default function FriendsView({ isVisible, onViewFriendTimeline }: Props) 
             {/* Use Invite Code */}
             <div style={{
               background: '#fff',
-              border: '1px solid #d0c4b0',
+              border: '1px solid var(--color-border-paper)',
               borderRadius: 8,
               padding: 24
             }}>
               <h3 style={{ fontSize: 18, marginBottom: 12, fontWeight: 600 }}>
                 {t('friends.useInvite') || 'Use Invite Code'}
               </h3>
-              <p style={{ fontSize: 14, color: '#666', marginBottom: 16 }}>
+              <p style={{ fontSize: 14, color: 'var(--color-text-secondary)', marginBottom: 16 }}>
                 {t('friends.useHint') || 'Enter a friend\'s invite code to send them a friend request.'}
               </p>
 
@@ -527,7 +527,7 @@ export default function FriendsView({ isVisible, onViewFriendTimeline }: Props) 
                   style={{
                     flex: 1,
                     padding: '12px 16px',
-                    border: '1px solid #d0c4b0',
+                    border: '1px solid var(--color-border-paper)',
                     borderRadius: 6,
                     fontSize: 16,
                     fontFamily: 'monospace',

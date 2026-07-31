@@ -1,0 +1,21 @@
+---
+name: vibe-loading
+description: Apply three-layer loading discipline: hot data, rules, and heavy docs with anti-bloat limits.
+alwaysApply: true
+globs:
+  - "**/*.md"
+  - "**/*.mdc"
+---
+
+# Vibe Loading Rules
+
+## Three Layers
+1. Hot: `CLAUDE.md`, `today.md`
+2. Rules: `.cursor/rules/*.mdc`
+3. Heavy: `docs/*.md` (on-demand only)
+
+## Anti-Bloat
+- Never pre-load all heavy docs.
+- Keep at most two heavy docs active simultaneously.
+- Summarize and release old heavy docs before loading new ones.
+- Declare each load action with target and purpose.

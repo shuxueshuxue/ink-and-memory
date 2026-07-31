@@ -1,3 +1,32 @@
+// [Input] frontend/src/components/.folder.md (about-view node)
+// [Output] Static About page with project summary, team members, timeline, and repository links.
+// [Pos] about-view node
+// [Sync] 2026-06-13: add structured team member data and include glide-the as a contributor.
+
+type TeamMember = {
+  name: string;
+  role: string;
+  description: string;
+};
+
+const teamMembers: TeamMember[] = [
+  {
+    name: 'F2J',
+    role: 'Creator & Developer',
+    description: 'A solo developer exploring the intersection of AI, writing tools, and reflective thinking.'
+  },
+  {
+    name: 'Sage',
+    role: 'Creator & Designer',
+    description: 'A designer with a keen eye for aesthetics and user experience, bringing thoughtful design to the intersection of AI and reflective writing.'
+  },
+  {
+    name: 'glide-the',
+    role: 'Contributor',
+    description: "Contributes to Ink & Memory's development and product iteration."
+  }
+];
+
 export default function AboutView() {
   return (
     <div style={{
@@ -19,7 +48,7 @@ export default function AboutView() {
           <h1 style={{
             fontSize: 42,
             fontWeight: 700,
-            color: '#2c2c2c',
+            color: 'var(--color-text-primary)',
             fontFamily: 'Georgia, "Times New Roman", serif',
             marginBottom: 16,
             letterSpacing: '-0.5px'
@@ -28,7 +57,7 @@ export default function AboutView() {
           </h1>
           <p style={{
             fontSize: 18,
-            color: '#666',
+            color: 'var(--color-text-secondary)',
             lineHeight: 1.6,
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           }}>
@@ -41,7 +70,7 @@ export default function AboutView() {
           <h2 style={{
             fontSize: 24,
             fontWeight: 600,
-            color: '#2c2c2c',
+            color: 'var(--color-text-primary)',
             marginBottom: 16,
             fontFamily: 'Georgia, "Times New Roman", serif'
           }}>
@@ -75,85 +104,53 @@ export default function AboutView() {
           <h2 style={{
             fontSize: 24,
             fontWeight: 600,
-            color: '#2c2c2c',
+            color: 'var(--color-text-primary)',
             marginBottom: 16,
             fontFamily: 'Georgia, "Times New Roman", serif'
           }}>
             The Team
           </h2>
 
-          {/* F2J Card */}
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.5)',
-            border: '1px solid #d0c4b0',
-            borderRadius: 8,
-            padding: 24,
-            marginBottom: 16
-          }}>
-            <div style={{ marginBottom: 12 }}>
-              <div style={{
-                fontSize: 18,
-                fontWeight: 600,
-                color: '#2c2c2c',
-                marginBottom: 4,
+          {teamMembers.map((member, index) => (
+            <div
+              key={member.name}
+              style={{
+                background: 'rgba(255, 255, 255, 0.5)',
+                border: '1px solid var(--color-border-paper)',
+                borderRadius: 8,
+                padding: 24,
+                marginBottom: index === teamMembers.length - 1 ? 0 : 16
+              }}
+            >
+              <div style={{ marginBottom: 12 }}>
+                <div style={{
+                  fontSize: 18,
+                  fontWeight: 600,
+                  color: 'var(--color-text-primary)',
+                  marginBottom: 4,
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                }}>
+                  {member.name}
+                </div>
+                <div style={{
+                  fontSize: 14,
+                  color: 'var(--color-text-secondary)',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+                }}>
+                  {member.role}
+                </div>
+              </div>
+              <p style={{
+                fontSize: 15,
+                color: '#555',
+                lineHeight: 1.6,
+                margin: 0,
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
               }}>
-                F2J
-              </div>
-              <div style={{
-                fontSize: 14,
-                color: '#666',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
-                Creator & Developer
-              </div>
+                {member.description}
+              </p>
             </div>
-            <p style={{
-              fontSize: 15,
-              color: '#555',
-              lineHeight: 1.6,
-              margin: 0,
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-            }}>
-              A solo developer exploring the intersection of AI, writing tools, and reflective thinking.
-            </p>
-          </div>
-
-          {/* Sage Card */}
-          <div style={{
-            background: 'rgba(255, 255, 255, 0.5)',
-            border: '1px solid #d0c4b0',
-            borderRadius: 8,
-            padding: 24
-          }}>
-            <div style={{ marginBottom: 12 }}>
-              <div style={{
-                fontSize: 18,
-                fontWeight: 600,
-                color: '#2c2c2c',
-                marginBottom: 4,
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
-                Sage
-              </div>
-              <div style={{
-                fontSize: 14,
-                color: '#666',
-                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-              }}>
-                Creator & Designer
-              </div>
-            </div>
-            <p style={{
-              fontSize: 15,
-              color: '#555',
-              lineHeight: 1.6,
-              margin: 0,
-              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-            }}>
-              A designer with a keen eye for aesthetics and user experience, bringing thoughtful design to the intersection of AI and reflective writing.
-            </p>
-          </div>
+          ))}
         </section>
 
         {/* Timeline Section */}
@@ -161,7 +158,7 @@ export default function AboutView() {
           <h2 style={{
             fontSize: 24,
             fontWeight: 600,
-            color: '#2c2c2c',
+            color: 'var(--color-text-primary)',
             marginBottom: 24,
             fontFamily: 'Georgia, "Times New Roman", serif'
           }}>
@@ -175,7 +172,7 @@ export default function AboutView() {
               top: 8,
               bottom: 8,
               width: 2,
-              background: '#d0c4b0'
+              background: 'var(--color-border-paper)'
             }} />
 
             {/* Timeline items */}
@@ -218,8 +215,8 @@ export default function AboutView() {
                   width: 10,
                   height: 10,
                   borderRadius: 5,
-                  background: '#2c2c2c',
-                  border: '2px solid #f8f0e6'
+                  background: 'var(--color-text-primary)',
+                  border: '2px solid var(--color-bg-app)'
                 }} />
 
                 <div style={{
@@ -233,7 +230,7 @@ export default function AboutView() {
                 <div style={{
                   fontSize: 16,
                   fontWeight: 600,
-                  color: '#2c2c2c',
+                  color: 'var(--color-text-primary)',
                   marginBottom: 4,
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}>
@@ -241,7 +238,7 @@ export default function AboutView() {
                 </div>
                 <div style={{
                   fontSize: 14,
-                  color: '#666',
+                  color: 'var(--color-text-secondary)',
                   lineHeight: 1.5,
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
                 }}>
@@ -257,7 +254,7 @@ export default function AboutView() {
           <h2 style={{
             fontSize: 24,
             fontWeight: 600,
-            color: '#2c2c2c',
+            color: 'var(--color-text-primary)',
             marginBottom: 16,
             fontFamily: 'Georgia, "Times New Roman", serif'
           }}>
@@ -274,10 +271,10 @@ export default function AboutView() {
                 gap: 8,
                 padding: '12px 20px',
                 background: 'rgba(255, 255, 255, 0.5)',
-                border: '1px solid #d0c4b0',
+                border: '1px solid var(--color-border-paper)',
                 borderRadius: 8,
                 textDecoration: 'none',
-                color: '#2c2c2c',
+                color: 'var(--color-text-primary)',
                 fontSize: 15,
                 fontWeight: 500,
                 transition: 'all 0.2s',
@@ -289,7 +286,7 @@ export default function AboutView() {
               }}
               onMouseLeave={e => {
                 e.currentTarget.style.background = 'rgba(255, 255, 255, 0.5)';
-                e.currentTarget.style.borderColor = '#d0c4b0';
+                e.currentTarget.style.borderColor = 'var(--color-border-paper)';
               }}
             >
               <svg height="18" width="18" viewBox="0 0 16 16" fill="currentColor">

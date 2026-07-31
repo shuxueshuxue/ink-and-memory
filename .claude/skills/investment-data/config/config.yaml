@@ -1,0 +1,34 @@
+# 投资数据 Skill 配置
+
+data:
+  # 数据存储路径
+  data_dir: ~/.qlib/qlib_data/cn_data
+
+  # 自动更新
+  auto_update: true
+  update_time: "09:00"
+
+  # 数据源优先级
+  sources:
+    - final  # 最终修正数据
+    - ts     # Tushare
+    - ak     # Akshare
+    - yahoo  # Yahoo
+    - baostock  # Baostock
+
+query:
+  # 默认输出格式
+  output_format: csv
+
+  # 日期格式
+  date_format: "%Y-%m-%d"
+
+  # 批量查询限制
+  batch_size: 100
+
+logging:
+  # 日志级别
+  level: INFO
+
+  # 日志文件
+  file: logs/investment_data.log

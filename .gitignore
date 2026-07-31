@@ -11,13 +11,14 @@ AGENTS.md
 operation_book.md
 .operations
 backend/pyrightconfig.json
-
+backend/uv.lock
 # Test artifacts
 backend/tests/*.pyc
 /tmp/test_server.log
 
 # Node
 frontend/node_modules/
+frontend/package-lock.json
 
 # IDE
 .vscode/
@@ -35,3 +36,11 @@ backend/ink-backend*.tar.gz
 
 # Project documentation (private)
 CLAUDE.md
+
+logs/*
+backend/uv.lock
+**/.env
+.storage-env
+.cloud-env
+.playwright-mcp
+output/

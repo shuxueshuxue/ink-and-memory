@@ -55,7 +55,7 @@ export default function CollectionsView({ isVisible, voiceConfigs, timezone }: C
       height: '100%',
       display: 'flex',
       fontFamily: "'Excalifont', 'Xiaolai', 'Georgia', serif",
-      background: '#f8f0e6',
+      background: 'var(--color-bg-app)',
       overflow: 'hidden'
     }}>
       <TimelinePage
@@ -274,13 +274,13 @@ function TimelineCard({
         width: '100%',
         height: `${CARD_HEIGHT}px`,
         boxSizing: 'border-box',
-        background: 'rgba(248, 240, 230, 0.8)',
+        background: 'color-mix(in srgb, var(--color-bg-app) 80%, transparent)',
         borderRadius: '8px',
       }}
       onMouseEnter={e => {
         if (dayData?.picture && !isGenerating) {
           e.currentTarget.style.transform = 'scale(1.02)';
-          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+          e.currentTarget.style.boxShadow = '0 4px 12px var(--color-shadow-soft)';
         }
       }}
       onMouseLeave={e => {
@@ -299,14 +299,14 @@ function TimelineCard({
         <div style={{
           fontSize: '13px',
           fontWeight: 600,
-          color: day.isToday ? '#2c2c2c' : '#666',
+          color: day.isToday ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
           marginBottom: '0.25rem'
         }}>
           {day.isToday ? t('timeline.today') : formatDate(day.date, dateLocale)}
         </div>
         <div style={{
           fontSize: '12px',
-          color: '#888',
+          color: 'var(--color-text-secondary)',
           fontStyle: description ? 'normal' : 'normal',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
@@ -331,7 +331,7 @@ function TimelineCard({
                 height: isMobile ? '64px' : '72px',
                 objectFit: 'cover',
                 borderRadius: '6px',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                boxShadow: '0 2px 8px var(--color-shadow-medium)'
               }}
             />
             {onGenerate && (
@@ -348,7 +348,7 @@ function TimelineCard({
                   width: '22px',
                   height: '22px',
                   borderRadius: '50%',
-                  background: 'rgba(255, 255, 255, 0.95)',
+                  background: 'var(--color-bg-surface-solid)',
                   border: 'none',
                   cursor: isGenerating ? 'wait' : 'pointer',
                   display: 'flex',
@@ -376,15 +376,15 @@ function TimelineCard({
             width: isMobile ? '64px' : '72px',
             height: isMobile ? '64px' : '72px',
             background: day.isFuture
-              ? 'linear-gradient(135deg, #f8f0e6 0%, #ede3d5 100%)'
-              : 'linear-gradient(135deg, #f0e8de 0%, #e5dbc9 100%)',
-            border: day.isFuture ? '2px dashed #d0c4b0' : '2px dashed #b8a896',
+              ? 'linear-gradient(135deg, var(--color-bg-app) 0%, var(--color-bg-surface-solid) 100%)'
+              : 'linear-gradient(135deg, var(--color-bg-paper) 0%, var(--color-bg-app) 100%)',
+            border: day.isFuture ? '2px dashed var(--color-border-paper)' : '2px dashed var(--color-border-paper)',
             borderRadius: '6px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             fontSize: '20px',
-            color: '#bbb',
+            color: 'var(--color-text-muted)',
           }}>
             {isGenerating ? '⏳' : ''}
           </div>
@@ -834,7 +834,7 @@ function TimelinePage({ isVisible, voiceConfigs, dateLocale, timezone, isMobile 
       style={{
         width: '100%',
         height: '100%',
-        background: '#f8f0e6',
+        background: 'var(--color-bg-app)',
         overflowX: 'hidden',
         overflowY: 'auto',
         display: 'flex',
@@ -860,7 +860,7 @@ function TimelinePage({ isVisible, voiceConfigs, dateLocale, timezone, isMobile 
             top: isMobile ? '1rem' : '2rem',
             bottom: isMobile ? '4rem' : '5rem',
             width: isMobile ? '2px' : '4px',
-            background: 'linear-gradient(180deg, transparent 0%, #d0c4b0 2%, #d0c4b0 98%, transparent 100%)',
+            background: 'linear-gradient(180deg, transparent 0%, var(--color-border-paper) 2%, var(--color-border-paper) 98%, transparent 100%)',
             transform: 'translateX(-50%)',
             zIndex: 1,
             opacity: 1
@@ -878,8 +878,9 @@ function TimelinePage({ isVisible, voiceConfigs, dateLocale, timezone, isMobile 
               left: '50%',
               transform: 'translateX(-50%)',
               padding: '6px 12px',
-              border: '1px solid #b8a896',
-              background: loadingPast ? '#eee' : '#f7f0e6',
+              border: '1px solid var(--color-border-paper)',
+              background: loadingPast ? 'var(--color-disabled-bg)' : 'var(--color-bg-paper)',
+              color: 'var(--color-text-secondary)',
               borderRadius: '6px',
               cursor: loadingPast ? 'wait' : 'pointer',
               zIndex: 20,
@@ -927,9 +928,9 @@ function TimelinePage({ isVisible, voiceConfigs, dateLocale, timezone, isMobile 
                   width: '14px',
                   height: '14px',
                   borderRadius: '50%',
-                  background: hasData ? '#4CAF50' : (day.isToday ? '#666' : '#ddd'),
-                  border: '3px solid #f8f0e6',
-                  boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                  background: hasData ? 'var(--color-state-success)' : (day.isToday ? 'var(--color-text-secondary)' : 'var(--color-border-neutral)'),
+                  border: '3px solid var(--color-bg-app)',
+                  boxShadow: '0 2px 6px var(--color-shadow-medium)',
                   zIndex: 10,
                 }}
               />
@@ -965,7 +966,7 @@ function TimelinePage({ isVisible, voiceConfigs, dateLocale, timezone, isMobile 
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'rgba(0, 0, 0, 0.6)',
+            background: 'var(--color-bg-overlay)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -981,10 +982,10 @@ function TimelinePage({ isVisible, voiceConfigs, dateLocale, timezone, isMobile 
               maxWidth: '1400px',
               width: '100%',
               maxHeight: isMobile ? '95vh' : '90vh',
-              background: '#fff',
+              background: 'var(--color-bg-paper)',
               borderRadius: '12px',
               overflow: 'hidden',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+              boxShadow: '0 8px 32px var(--color-shadow-medium)',
               marginTop: isMobile ? 0 : '2rem'
             }}
             onClick={(e) => e.stopPropagation()}
@@ -1022,7 +1023,7 @@ function TimelinePage({ isVisible, voiceConfigs, dateLocale, timezone, isMobile 
                     position: 'absolute',
                     top: '1.5rem',
                     right: '1.5rem',
-                    background: 'rgba(255, 255, 255, 0.95)',
+                    background: 'var(--color-bg-surface-solid)',
                     border: 'none',
                     borderRadius: '50%',
                     width: '36px',
@@ -1032,17 +1033,17 @@ function TimelinePage({ isVisible, voiceConfigs, dateLocale, timezone, isMobile 
                     alignItems: 'center',
                     justifyContent: 'center',
                     fontSize: '22px',
-                    color: '#333',
+                    color: 'var(--color-text-body)',
                     fontWeight: 'bold',
                     transition: 'all 0.2s',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+                    boxShadow: '0 2px 8px var(--color-shadow-medium)'
                   }}
                   onMouseEnter={e => {
-                    e.currentTarget.style.background = '#f0f0f0';
+                    e.currentTarget.style.background = 'var(--color-bg-hover)';
                     e.currentTarget.style.transform = 'scale(1.1)';
                   }}
                   onMouseLeave={e => {
-                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.95)';
+                    e.currentTarget.style.background = 'var(--color-bg-surface-solid)';
                     e.currentTarget.style.transform = 'scale(1)';
                   }}
                 >
@@ -1053,7 +1054,7 @@ function TimelinePage({ isVisible, voiceConfigs, dateLocale, timezone, isMobile 
               {/* Starred comments on right */}
               <div style={{
                 flex: isMobile ? '1 1 auto' : '0 0 45%',
-                background: '#f9f7f4',
+                background: 'var(--color-bg-surface)',
                 display: 'flex',
                 flexDirection: 'column',
                 overflow: 'hidden',
@@ -1062,12 +1063,12 @@ function TimelinePage({ isVisible, voiceConfigs, dateLocale, timezone, isMobile 
                 {/* Header */}
                 <div style={{
                   padding: isMobile ? '1rem 1.25rem 0.75rem' : '2rem 2rem 1rem',
-                  borderBottom: '1px solid #e0d8cc',
+                  borderBottom: '1px solid var(--color-border-paper)',
                   flexShrink: 0
                 }}>
                   <div style={{
                     fontSize: '13px',
-                    color: '#aaa',
+                    color: 'var(--color-text-muted)',
                     fontWeight: 600,
                     textTransform: 'uppercase',
                     letterSpacing: '0.1em'
@@ -1093,7 +1094,7 @@ function TimelinePage({ isVisible, voiceConfigs, dateLocale, timezone, isMobile 
                       return (
                         <div style={{
                           textAlign: 'center',
-                          color: '#999',
+                          color: 'var(--color-text-muted)',
                           fontSize: '14px',
                           fontStyle: 'italic',
                           padding: '2rem 1rem'
@@ -1131,7 +1132,7 @@ function TimelinePage({ isVisible, voiceConfigs, dateLocale, timezone, isMobile 
                       return (
                         <div style={{
                           textAlign: 'center',
-                          color: '#999',
+                          color: 'var(--color-text-muted)',
                           fontSize: '14px',
                           fontStyle: 'italic',
                           padding: '2rem 1rem'
@@ -1152,8 +1153,8 @@ function TimelinePage({ isVisible, voiceConfigs, dateLocale, timezone, isMobile 
                           <div
                             key={comment.id}
                             style={{
-                              background: '#fff',
-                              border: '1px solid #e0d8cc',
+                              background: 'var(--color-bg-surface-solid)',
+                              border: '1px solid var(--color-border-paper)',
                               borderRadius: '8px',
                               padding: '1rem',
                               transition: 'all 0.2s',
@@ -1168,7 +1169,7 @@ function TimelinePage({ isVisible, voiceConfigs, dateLocale, timezone, isMobile 
                               minWidth: 0
                             }}>
                               <span style={{ fontSize: '18px', flexShrink: 0 }}>{getIconForVoice(comment.icon)}</span>
-                              <span style={{ fontWeight: 600, fontSize: '14px', color: '#333', flexShrink: 0 }}>{voiceConfigs[comment.voice]?.name || comment.voice}</span>
+                              <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--color-text-body)', flexShrink: 0 }}>{voiceConfigs[comment.voice]?.name || comment.voice}</span>
                               {comment.feedback === 'star' && (
                                 <span style={{ fontSize: '14px', marginLeft: 'auto', flexShrink: 0 }}>⭐</span>
                               )}
@@ -1179,10 +1180,10 @@ function TimelinePage({ isVisible, voiceConfigs, dateLocale, timezone, isMobile 
                             <div style={{
                               fontSize: '12px',
                               fontStyle: 'italic',
-                              color: '#999',
+                              color: 'var(--color-text-muted)',
                               marginBottom: '0.75rem',
                               paddingLeft: '1.5rem',
-                              borderLeft: '2px solid #e0d8cc',
+                              borderLeft: '2px solid var(--color-border-paper)',
                               wordBreak: 'break-word',
                               overflowWrap: 'anywhere',
                               minWidth: 0
@@ -1191,7 +1192,7 @@ function TimelinePage({ isVisible, voiceConfigs, dateLocale, timezone, isMobile 
                             </div>
                             <div style={{
                               fontSize: '13px',
-                              color: '#555',
+                              color: 'var(--color-text-secondary)',
                               lineHeight: '1.7',
                               paddingLeft: '0.5rem',
                               wordBreak: 'break-word',
@@ -1212,8 +1213,8 @@ function TimelinePage({ isVisible, voiceConfigs, dateLocale, timezone, isMobile 
 
             {/* Bottom metadata bar */}
             <div style={{
-              borderTop: '1px solid #e0d8cc',
-              background: '#f0e8de',
+              borderTop: '1px solid var(--color-border-paper)',
+              background: 'var(--color-bg-app)',
               padding: isMobile ? '0.75rem 1.25rem' : '1rem 2rem',
               display: 'flex',
               alignItems: 'center',
@@ -1222,7 +1223,7 @@ function TimelinePage({ isVisible, voiceConfigs, dateLocale, timezone, isMobile 
             }}>
               <div style={{
                 fontSize: '13px',
-                color: '#666'
+                color: 'var(--color-text-secondary)'
               }}>
                 {new Date(viewingImage.date).toLocaleDateString(dateLocale, {
                   year: 'numeric',
@@ -1232,7 +1233,7 @@ function TimelinePage({ isVisible, voiceConfigs, dateLocale, timezone, isMobile 
               </div>
               <div style={{
                 fontSize: '13px',
-                color: '#888'
+                color: 'var(--color-text-secondary)'
               }}>
                 {(() => {
                   const commentCount =

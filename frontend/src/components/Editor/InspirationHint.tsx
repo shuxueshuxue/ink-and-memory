@@ -61,7 +61,7 @@ export function InspirationHint({
         style={{
           fontSize: '24px',
           flexShrink: 0,
-          color: '#666',
+          color: 'var(--color-text-secondary)',
         }}
       >
         <Icon />

@@ -117,7 +117,7 @@ export function CommentGroupCard({
             bottom: '100%',
             left: 0,
             right: 0,
-            background: 'rgba(255,255,255,0.95)',
+            background: 'var(--color-bg-surface-solid)',
             borderLeft: `2px solid ${colors.glow}`,
             borderRadius: '4px 4px 0 0',
             marginBottom: '-4px',
@@ -130,7 +130,7 @@ export function CommentGroupCard({
               background: colors.gradient,
               borderRadius: '4px 4px 0 0',
               fontSize: '13px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              boxShadow: '0 4px 12px var(--color-shadow-medium)',
             }}
           >
           <div style={{
@@ -156,7 +156,7 @@ export function CommentGroupCard({
                       }}
                       style={{
                         background: idx === safeIndex ? colors.text : 'transparent',
-                        color: idx === safeIndex ? '#fff' : colors.text,
+                        color: idx === safeIndex ? 'var(--color-text-on-action)' : colors.text,
                         border: 'none',
                         borderRadius: '3px',
                         padding: '2px 6px',
@@ -190,7 +190,7 @@ export function CommentGroupCard({
                   onStar();
                 }}
                 style={{
-                  background: currentComment.feedback === 'star' ? '#ffd700' : 'transparent',
+                  background: currentComment.feedback === 'star' ? 'var(--color-state-warning)' : 'transparent',
                   border: 'none',
                   borderRadius: '3px',
                   padding: '3px 5px',
@@ -201,7 +201,7 @@ export function CommentGroupCard({
                   transition: 'background 0.2s',
                 }}
               >
-                <FaStar size={10} color={currentComment.feedback === 'star' ? '#fff' : colors.text} style={{ opacity: currentComment.feedback === 'star' ? 1 : 0.5 }} />
+                <FaStar size={10} color={currentComment.feedback === 'star' ? 'var(--color-text-on-action)' : colors.text} style={{ opacity: currentComment.feedback === 'star' ? 1 : 0.5 }} />
               </button>
               <button
                 onClick={(e) => {
@@ -209,7 +209,7 @@ export function CommentGroupCard({
                   onKill();
                 }}
                 style={{
-                  background: currentComment.feedback === 'kill' ? '#ff4444' : 'transparent',
+                  background: currentComment.feedback === 'kill' ? 'var(--color-state-danger)' : 'transparent',
                   border: 'none',
                   borderRadius: '3px',
                   padding: '3px 5px',
@@ -220,7 +220,7 @@ export function CommentGroupCard({
                   transition: 'background 0.2s',
                 }}
               >
-                <FaTrash size={10} color={currentComment.feedback === 'kill' ? '#fff' : colors.text} style={{ opacity: currentComment.feedback === 'kill' ? 1 : 0.5 }} />
+                <FaTrash size={10} color={currentComment.feedback === 'kill' ? 'var(--color-text-on-action)' : colors.text} style={{ opacity: currentComment.feedback === 'kill' ? 1 : 0.5 }} />
               </button>
               <button
                 onClick={(e) => {
@@ -262,7 +262,7 @@ export function CommentGroupCard({
               left: 0,
               right: 0,
               bottom: 0,
-              background: 'rgba(255,255,255,0.95)',
+              background: 'var(--color-bg-surface-solid)',
               borderLeft: `2px solid ${colors.glow}`,
               borderRadius: '0 0 4px 4px',
             }}
@@ -278,7 +278,7 @@ export function CommentGroupCard({
             borderRadius: isExpanded ? '0' : '4px',
             fontSize: '13px',
             lineHeight: '1.4',
-            boxShadow: isHovered || isExpanded ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
+            boxShadow: isHovered || isExpanded ? '0 4px 12px var(--color-shadow-medium)' : 'none',
             transition: 'box-shadow 0.2s ease',
           }}
         >
@@ -415,8 +415,8 @@ export function CommentGroupCard({
                   fontSize: '12px',
                   border: `1px solid ${colors.glow}`,
                   borderRadius: '3px',
-                  background: 'rgba(255,255,255,0.9)',
-                  color: '#333',
+                  background: 'var(--color-bg-surface-solid)',
+                  color: 'var(--color-text-body)',
                   fontFamily: "'Excalifont', 'Xiaolai', 'Georgia', serif",
                 }}
               />
@@ -429,8 +429,8 @@ export function CommentGroupCard({
                 style={{
                   padding: '6px 12px',
                   fontSize: '12px',
-                  background: inputValue.trim() && !isChatProcessing ? '#4a90e2' : '#ccc',
-                  color: '#fff',
+                  background: inputValue.trim() && !isChatProcessing ? 'var(--color-action-link)' : '#ccc',
+                  color: 'var(--color-text-on-action)',
                   border: 'none',
                   borderRadius: '3px',
                   cursor: inputValue.trim() && !isChatProcessing ? 'pointer' : 'not-allowed',

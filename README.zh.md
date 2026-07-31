@@ -169,6 +169,21 @@ npm run dev  # 运行在 http://localhost:5173
 
 ---
 
+## 部署
+
+将 Ink & Memory 部署到 **Google Cloud Run**（前后端分离，SQLite 通过 Cloud Storage FUSE 持久化）：
+
+```bash
+export GCP_PROJECT_ID=your-project-id
+./deploy/google-cloud/deploy.sh setup-storage  # 一次性：GCS bucket + 服务账号
+./deploy/google-cloud/deploy.sh setup-env      # 一次性：secrets + 环境变量
+./deploy/google-cloud/deploy.sh deploy         # 每次发版执行
+```
+
+完整说明见 [docs/deploy/overview.md](docs/deploy/overview.md)。
+
+---
+
 ## 参与贡献
 
 这是一个开源项目，我们欢迎你的参与。

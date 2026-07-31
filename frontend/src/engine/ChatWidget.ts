@@ -1,13 +1,16 @@
 /**
- * ChatWidget - Persistent 1-to-1 chat with a voice agent
+ * ChatWidget - Agent reference card linked to a Claude-agent thread.
  *
- * Each widget maintains its own conversation history.
+ * Each widget stores the associated Claude-agent thread_id so the user can
+ * jump from the Writing view directly into the persisted Chat session.
  * The widget is inserted after the line where @ was triggered.
  */
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  /** Extended thinking/reasoning text produced before the response. */
+  thinking?: string;
   timestamp: number;
 }
 
@@ -20,14 +23,18 @@ export interface ChatWidgetData {
     icon: string;
     color: string;
   };
+  /** Claude-agent thread_id for the linked Chat session. */
+  threadId?: string;
   messages: ChatMessage[];
   createdAt: number;
+  /** Whether the widget is collapsed in the Writing view. */
+  collapsed?: boolean;
 }
 
 export class ChatWidget {
   private data: ChatWidgetData;
 
-  constructor(voiceName: string, voiceConfig: any) {
+  constructor(voiceName: string, voiceConfig: any, threadId?: string) {
     this.data = {
       id: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(),
       voiceName,
@@ -37,6 +44,7 @@ export class ChatWidget {
         icon: voiceConfig.icon,
         color: voiceConfig.color
       },
+      threadId,
       messages: [],
       createdAt: Date.now()
     };
@@ -59,10 +67,11 @@ export class ChatWidget {
   }
 
   // @@@ Add assistant response (after backend returns)
-  addAssistantMessage(content: string): void {
+  addAssistantMessage(content: string, thinking?: string): void {
     this.data.messages.push({
       role: 'assistant',
       content,
+      ...(thinking ? { thinking } : {}),
       timestamp: Date.now()
     });
   }
@@ -94,5 +103,9 @@ export class ChatWidget {
 
   getMessages(): ChatMessage[] {
     return this.data.messages;
+  }
+
+  getThreadId(): string | undefined {
+    return this.data.threadId;
   }
 }

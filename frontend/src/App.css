@@ -1,3 +1,7 @@
+/* [Input] App-level React class names and semantic theme tokens from styles/tokens.css. */
+/* [Output] Global app shell, notebook, binder, scrollbar, and modal styling. */
+/* [Pos] app-style sheet in frontend/src */
+/* [Sync] 2026-05-29: restore notebook ruled-line colors to existing theme tokens. */
 @font-face {
   font-family: 'Excalifont';
   src: url('/Excalifont-Regular.woff2') format('woff2');
@@ -23,7 +27,7 @@
   right: 0;
   bottom: 0;
   display: flex;
-  background-color: #f8f0e6;
+  background-color: var(--color-bg-app);
   padding: 1rem 2rem 2rem 2rem;
   gap: 2rem;
   box-sizing: border-box;
@@ -40,8 +44,8 @@
 .book-page {
   flex: 1;
   display: flex;
-  background-color: #fffef9;
-  border: 1px solid #ccc;
+  background-color: var(--color-bg-paper);
+  border: 1px solid var(--color-border-neutral);
   border-radius: 4px;
   position: relative;
   overflow: hidden;
@@ -75,7 +79,7 @@
   font-family: 'Excalifont', 'Xiaolai', 'Georgia', serif;
   font-size: 1rem;
   line-height: 1.6;
-  color: #333;
+  color: var(--color-text-body);
   animation: fadeIn 0.5s ease-in;
   word-wrap: break-word;
   overflow-wrap: break-word;
@@ -99,6 +103,26 @@
 
 .voice-text {
   margin-left: 1.75rem;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+.skeleton-block {
+  animation: skeletonPulse 1.4s ease-in-out infinite;
+  background: var(--color-border-paper);
+  border-radius: 0.5rem;
 }
 
 @keyframes fadeIn {
@@ -185,7 +209,7 @@
   width: var(--hole-diameter);
   height: var(--hole-diameter);
   border-radius: 50%;
-  background: #f8f0e6;
+  background: var(--color-bg-app);
   z-index: 102;
 }
 
@@ -205,9 +229,9 @@
   width: var(--bar-width);
   height: var(--bar-height);
   background: linear-gradient(180deg,
-    #666 0%,
-    #aaa 50%,
-    #666 100%
+    var(--color-text-secondary) 0%,
+    var(--color-scrollbar-thumb) 50%,
+    var(--color-text-secondary) 100%
   );
   border-radius: calc(var(--bar-height) / 2);
   z-index: 103;
@@ -248,15 +272,17 @@
 
 /* @@@ Notebook ruled lines background */
 .notebook-lines {
+  --notebook-margin-line: color-mix(in srgb, var(--color-state-error) 24%, transparent);
+  --notebook-rule-line: color-mix(in srgb, var(--color-border-paper) 58%, transparent);
   background-image:
     /* Vertical margin line (left) */
-    linear-gradient(to right, transparent 0, transparent 39px, rgba(255, 100, 100, 0.15) 40px, rgba(255, 100, 100, 0.15) 41px, transparent 41px),
+    linear-gradient(to right, transparent 0, transparent 39px, var(--notebook-margin-line) 40px, var(--notebook-margin-line) 41px, transparent 41px),
     /* Horizontal ruled lines */
     repeating-linear-gradient(
       transparent,
       transparent 31.4px,
-      rgba(170, 170, 180, 0.2) 31.4px,
-      rgba(170, 170, 180, 0.2) 32.4px
+      var(--notebook-rule-line) 31.4px,
+      var(--notebook-rule-line) 32.4px
     );
   background-size: 100% 100%;
   background-position: 0 0;
@@ -276,13 +302,13 @@
 
 .writing-textarea::-webkit-scrollbar-thumb,
 .comments-panel::-webkit-scrollbar-thumb {
-  background: #ccc;
+  background: var(--color-scrollbar-thumb);
   border-radius: 4px;
 }
 
 .writing-textarea::-webkit-scrollbar-thumb:hover,
 .comments-panel::-webkit-scrollbar-thumb:hover {
-  background: #999;
+  background: var(--color-scrollbar-thumb-hover);
 }
 
 .voice-input-modal {

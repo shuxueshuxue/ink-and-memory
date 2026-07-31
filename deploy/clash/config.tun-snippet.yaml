@@ -1,0 +1,21 @@
+# Merge these non-secret keys into deploy/clash/config.yaml.
+# Keep your real proxies, proxy-groups, rules, subscriptions, and passwords out of git.
+
+external-controller: 0.0.0.0:9090
+
+tun:
+  enable: true
+  stack: system
+  auto-route: true
+  auto-detect-interface: true
+  strict-route: false
+  dns-hijack:
+    - any:53
+
+dns:
+  enable: true
+  listen: 0.0.0.0:1053
+  enhanced-mode: fake-ip
+  nameserver:
+    - 1.1.1.1
+    - 8.8.8.8

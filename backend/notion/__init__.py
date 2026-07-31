@@ -1,0 +1,105 @@
+# [Input] Notion connector backend package modules.
+# [Output] Expose the Notion connector facade and helper APIs.
+# [Pos] package init in backend/notion
+# [Sync] 2026-07-04: initial Notion connector backend package export surface.
+
+"""Notion resource connector backend package."""
+from __future__ import annotations
+
+from .auth import AuthStatusResult, LoginInitResult, build_notion_env, ensure_notion_home, poll_login, resolve_notion_home, start_login, verify_status
+from .errors import (
+    NotionAuthError,
+    NotionAuthTimeoutError,
+    NotionCLIUnavailableError,
+    NotionConfigError,
+    NotionConnectorError,
+    NotionConnectorNotFoundError,
+    NotionOperationError,
+    NotionSnapshotError,
+    NotionSnapshotNotReadyError,
+)
+from .factory import NotionConnectorFacade, build_notion_facade
+from .operations import (
+    DatabaseQuery,
+    NotionOperationClient,
+    OperationResult,
+    SearchFilter,
+    SearchResult,
+    discover_databases,
+    discover_pages,
+    normalize_database_item,
+    normalize_page_item,
+)
+from .store import (
+    DB_PATH,
+    attach_thread_to_connector,
+    create_connector,
+    delete_connector,
+    delete_connector_resource,
+    get_active_connector_for_user,
+    get_connector,
+    get_connector_for_thread,
+    get_current_snapshot,
+    get_db,
+    get_snapshot,
+    list_connector_resources,
+    list_connectors,
+    list_snapshots,
+    replace_connector_resources,
+    save_auth_state,
+    save_snapshot,
+    update_connector,
+)
+from .sync import build_canonical_snapshot, clear_workspace_snapshot, materialize_workspace_snapshot
+
+__all__ = [
+    "AuthStatusResult",
+    "LoginInitResult",
+    "build_notion_env",
+    "ensure_notion_home",
+    "poll_login",
+    "resolve_notion_home",
+    "start_login",
+    "verify_status",
+    "NotionAuthError",
+    "NotionAuthTimeoutError",
+    "NotionCLIUnavailableError",
+    "NotionConfigError",
+    "NotionConnectorError",
+    "NotionConnectorNotFoundError",
+    "NotionOperationError",
+    "NotionSnapshotError",
+    "NotionSnapshotNotReadyError",
+    "NotionConnectorFacade",
+    "build_notion_facade",
+    "DatabaseQuery",
+    "NotionOperationClient",
+    "OperationResult",
+    "SearchFilter",
+    "SearchResult",
+    "discover_databases",
+    "discover_pages",
+    "normalize_database_item",
+    "normalize_page_item",
+    "DB_PATH",
+    "attach_thread_to_connector",
+    "clear_workspace_snapshot",
+    "create_connector",
+    "delete_connector",
+    "delete_connector_resource",
+    "get_active_connector_for_user",
+    "get_connector",
+    "get_connector_for_thread",
+    "get_current_snapshot",
+    "get_db",
+    "get_snapshot",
+    "list_connector_resources",
+    "list_connectors",
+    "list_snapshots",
+    "replace_connector_resources",
+    "save_auth_state",
+    "save_snapshot",
+    "update_connector",
+    "build_canonical_snapshot",
+    "materialize_workspace_snapshot",
+]

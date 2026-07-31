@@ -1,0 +1,32 @@
+---
+name: vibe-engineering
+description: Enforce low coupling/high cohesion, centralized configuration, no hard-coded business variables, and no overlapping feature implementations.
+alwaysApply: true
+globs:
+  - "**/*.py"
+  - "**/*.sh"
+  - "**/*.js"
+  - "**/*.jsx"
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.go"
+  - "**/*.rs"
+  - "**/*.java"
+---
+
+# Vibe Engineering Rules
+
+## Architecture Principles
+- Keep modules low-coupled and high-cohesion.
+- Enforce single responsibility per component/service.
+- Reuse existing modules before adding new entities.
+
+## Hard-Coding Guardrail
+- Do not hard-code business identifiers, paths, model params, or thresholds in feature code.
+- Store configurable values in centralized config files or settings modules.
+- Any new constant must include source-of-truth location and purpose.
+
+## Overlap Guardrail
+- Do not implement duplicate features with parallel code paths.
+- Extend existing workflow if semantics overlap > 70%.
+- If a new implementation is required, record why reuse is not possible.

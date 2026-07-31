@@ -1,8 +1,14 @@
 /**
+ * [Input] AuthContext login/google helpers and login form callbacks.
+ * [Output] Login form with password and Google OAuth entry points.
+ * [Pos] login-form component node in frontend/src/components/Auth
+ * [Sync] 2026-06-23: add Continue with Google button backed by Python OAuth login.
+ *
  * Login form component
  */
 
 import React, { useState } from 'react';
+import { FaGoogle } from 'react-icons/fa';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface LoginFormProps {
@@ -11,7 +17,7 @@ interface LoginFormProps {
 }
 
 export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormProps) {
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -38,17 +44,17 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
       maxWidth: '400px',
       margin: '0 auto',
       padding: '32px',
-      backgroundColor: '#fffef9',
-      border: '2px solid #d0c4b0',
+      backgroundColor: 'var(--color-bg-paper)',
+      border: '2px solid var(--color-border-paper)',
       borderRadius: '12px',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+      boxShadow: '0 4px 12px var(--color-shadow-soft)',
       fontFamily: "'Excalifont', 'Xiaolai', 'Georgia', serif"
     }}>
       <h2 style={{
         margin: '0 0 24px 0',
         fontSize: '24px',
         fontWeight: 600,
-        color: '#333',
+        color: 'var(--color-text-body)',
         textAlign: 'center'
       }}>
         Welcome Back
@@ -58,15 +64,54 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
         <div style={{
           padding: '12px',
           marginBottom: '16px',
-          backgroundColor: '#fee',
-          border: '1px solid #fcc',
+          backgroundColor: 'color-mix(in srgb, var(--color-state-danger) 8%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--color-state-danger) 25%, transparent)',
           borderRadius: '6px',
           fontSize: '14px',
-          color: '#c33'
+          color: 'var(--color-state-danger)'
         }}>
           {error}
         </div>
       )}
+
+      <button
+        type="button"
+        onClick={loginWithGoogle}
+        disabled={isSubmitting}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
+          padding: '11px',
+          border: '1px solid var(--color-border-paper)',
+          borderRadius: '6px',
+          backgroundColor: 'var(--color-bg-surface-solid)',
+          color: 'var(--color-text-body)',
+          fontSize: '15px',
+          fontWeight: 600,
+          cursor: isSubmitting ? 'not-allowed' : 'pointer',
+          fontFamily: "'Excalifont', 'Xiaolai', 'Georgia', serif",
+          marginBottom: '18px'
+        }}
+      >
+        <FaGoogle aria-hidden="true" />
+        Continue with Google
+      </button>
+
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '10px',
+        marginBottom: '18px',
+        color: 'var(--color-text-muted)',
+        fontSize: '13px'
+      }}>
+        <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--color-border-paper)' }} />
+        <span>or</span>
+        <div style={{ flex: 1, height: '1px', backgroundColor: 'var(--color-border-paper)' }} />
+      </div>
 
       <form onSubmit={handleSubmit}>
         <div style={{ marginBottom: '16px' }}>
@@ -75,7 +120,7 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
             marginBottom: '6px',
             fontSize: '14px',
             fontWeight: 500,
-            color: '#555'
+            color: 'var(--color-text-secondary)'
           }}>
             Email
           </label>
@@ -88,10 +133,12 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
             style={{
               width: '100%',
               padding: '10px 12px',
-              border: '1px solid #d0c4b0',
+              border: '1px solid var(--color-border-paper)',
               borderRadius: '6px',
               fontSize: '15px',
               fontFamily: "'Excalifont', 'Xiaolai', 'Georgia', serif",
+              backgroundColor: 'var(--color-bg-surface-solid)',
+              color: 'var(--color-text-body)',
               boxSizing: 'border-box'
             }}
           />
@@ -103,7 +150,7 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
             marginBottom: '6px',
             fontSize: '14px',
             fontWeight: 500,
-            color: '#555'
+            color: 'var(--color-text-secondary)'
           }}>
             Password
           </label>
@@ -116,10 +163,12 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
             style={{
               width: '100%',
               padding: '10px 12px',
-              border: '1px solid #d0c4b0',
+              border: '1px solid var(--color-border-paper)',
               borderRadius: '6px',
               fontSize: '15px',
               fontFamily: "'Excalifont', 'Xiaolai', 'Georgia', serif",
+              backgroundColor: 'var(--color-bg-surface-solid)',
+              color: 'var(--color-text-body)',
               boxSizing: 'border-box'
             }}
           />
@@ -133,8 +182,8 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
             padding: '12px',
             border: 'none',
             borderRadius: '6px',
-            backgroundColor: isSubmitting ? '#ccc' : '#4a90e2',
-            color: 'white',
+            backgroundColor: isSubmitting ? 'var(--color-disabled-bg)' : 'var(--color-action-link)',
+            color: 'var(--color-text-on-action)',
             fontSize: '16px',
             fontWeight: 600,
             cursor: isSubmitting ? 'not-allowed' : 'pointer',
@@ -143,12 +192,12 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
           }}
           onMouseEnter={(e) => {
             if (!isSubmitting) {
-              e.currentTarget.style.backgroundColor = '#357abd';
+              e.currentTarget.style.backgroundColor = 'var(--color-action-link-hover)';
             }
           }}
           onMouseLeave={(e) => {
             if (!isSubmitting) {
-              e.currentTarget.style.backgroundColor = '#4a90e2';
+              e.currentTarget.style.backgroundColor = 'var(--color-action-link)';
             }
           }}
         >
@@ -160,7 +209,7 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
         marginTop: '20px',
         textAlign: 'center',
         fontSize: '14px',
-        color: '#666'
+        color: 'var(--color-text-secondary)'
       }}>
         Don't have an account?{' '}
         <button
@@ -169,7 +218,7 @@ export default function LoginForm({ onSuccess, onSwitchToRegister }: LoginFormPr
           style={{
             background: 'none',
             border: 'none',
-            color: '#4a90e2',
+            color: 'var(--color-action-link)',
             cursor: 'pointer',
             textDecoration: 'underline',
             fontSize: '14px',

@@ -1,6 +1,13 @@
+// [Input] Deck/voice API types, deck visual metadata, and optional Chat handoff callback.
+// [Output] Modal editor for deck metadata, voice list, selected voice prompt, and chat launch.
+// [Pos] deck-editor-modal ui in frontend/src/components
+// [Sync] 2026-07-08: replace light-only modal panels, form fields, and voice rows with semantic
+//                    theme tokens so the Deck editor stays readable in dark mode.
 import { useMemo } from 'react';
 import type { Deck, Voice } from '../api/voiceApi';
+import { ensureVoiceThread } from '../api/voiceApi';
 import { COLORS, iconMap } from './deckVisuals';
+import type { ActiveChatVoice } from '../lib/chat-schema';
 
 interface Props {
   deck: Deck;
@@ -14,6 +21,7 @@ interface Props {
   onUpdateVoice: (voiceId: string, data: Partial<Voice>) => Promise<void>;
   onToggleVoice: (voiceId: string, currentEnabled: boolean) => Promise<void>;
   onDeleteVoice: (voiceId: string) => Promise<void>;
+  onOpenChat?: (threadId: string, voiceInfo: ActiveChatVoice) => void;
 }
 
 export default function DeckEditorModal({
@@ -27,9 +35,10 @@ export default function DeckEditorModal({
   onUpdateDeck,
   onUpdateVoice,
   onToggleVoice,
-  onDeleteVoice
+  onDeleteVoice,
+  onOpenChat
 }: Props) {
-  const voices = deck.voices || [];
+  const voices = useMemo(() => deck.voices || [], [deck.voices]);
   const selectedVoice = useMemo(
     () => voices.find(v => v.id === selectedVoiceId) || null,
     [voices, selectedVoiceId]
@@ -43,7 +52,7 @@ export default function DeckEditorModal({
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(0,0,0,0.45)',
+        background: 'var(--color-bg-overlay)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -59,11 +68,11 @@ export default function DeckEditorModal({
           width: 'min(1200px, 100%)',
           height: '85vh',
           maxHeight: '85vh',
-          background: '#f8f0e6',
+          background: 'var(--color-bg-app)',
           borderRadius: 14,
           overflow: 'hidden',
-          border: '2px solid #d0c4b0',
-          boxShadow: '0 16px 36px rgba(0,0,0,0.25)',
+          border: '2px solid var(--color-border-paper)',
+          boxShadow: '0 16px 36px var(--color-shadow-medium)',
           display: 'flex',
           flexDirection: 'column'
         }}
@@ -73,33 +82,33 @@ export default function DeckEditorModal({
           justifyContent: 'space-between',
           alignItems: 'center',
           padding: '16px 18px',
-          borderBottom: '1px solid #d0c4b0',
-          background: '#fff'
+          borderBottom: '1px solid var(--color-border-paper)',
+          background: 'var(--color-bg-surface-solid)'
         }}>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#2c2c2c', letterSpacing: -0.3 }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)', letterSpacing: -0.3 }}>
             Deck Editor
           </div>
           <button
             onClick={onClose}
             style={{
-              background: '#f7f3ed',
-              border: '1px solid #d0c4b0',
+              background: 'var(--color-bg-surface)',
+              border: '1px solid var(--color-border-paper)',
               borderRadius: 10,
               padding: '8px 14px',
               cursor: 'pointer',
               fontSize: 13,
               fontWeight: 600,
-              color: '#2c2c2c',
-              boxShadow: '0 2px 6px rgba(0,0,0,0.08)',
+              color: 'var(--color-text-primary)',
+              boxShadow: '0 2px 6px var(--color-shadow-soft)',
               transition: 'all 0.15s'
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-1px)';
-              e.currentTarget.style.boxShadow = '0 4px 10px rgba(0,0,0,0.12)';
+              e.currentTarget.style.boxShadow = '0 4px 10px var(--color-shadow-medium)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 2px 6px rgba(0,0,0,0.08)';
+              e.currentTarget.style.boxShadow = '0 2px 6px var(--color-shadow-soft)';
             }}
           >
             Close
@@ -116,11 +125,11 @@ export default function DeckEditorModal({
             <div style={{
               flex: '0 1 360px',
               minWidth: 260,
-              background: '#fff',
-              border: '2px solid #e0e0e0',
+              background: 'var(--color-bg-surface-solid)',
+              border: '2px solid var(--color-border-neutral)',
               borderRadius: 12,
               padding: 16,
-              boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+              boxShadow: '0 2px 6px var(--color-shadow-soft)',
               display: 'flex',
               flexDirection: 'column',
               gap: 10,
@@ -129,7 +138,7 @@ export default function DeckEditorModal({
               <div style={{
                 fontSize: 11,
                 fontWeight: 600,
-                color: '#666',
+                color: 'var(--color-text-secondary)',
                 letterSpacing: 0.5,
                 textTransform: 'uppercase'
               }}>
@@ -150,17 +159,17 @@ export default function DeckEditorModal({
                   padding: '10px 12px',
                   fontSize: 15,
                   fontWeight: 600,
-                  border: '2px solid #e0e0e0',
+                  border: '2px solid var(--color-border-neutral)',
                   borderRadius: 8,
-                  background: isSystem ? '#f5f5f5' : '#fff',
-                  color: '#2c2c2c',
+                  background: isSystem ? 'var(--color-disabled-bg)' : 'var(--color-bg-paper)',
+                  color: 'var(--color-text-primary)',
                   boxSizing: 'border-box'
                 }}
               />
               <div style={{
                 fontSize: 11,
                 fontWeight: 600,
-                color: '#666',
+                color: 'var(--color-text-secondary)',
                 letterSpacing: 0.5,
                 textTransform: 'uppercase'
               }}>
@@ -181,9 +190,10 @@ export default function DeckEditorModal({
                   padding: '10px 12px',
                   fontSize: 13,
                   fontFamily: 'monospace',
-                  border: '2px solid #e0e0e0',
+                  border: '2px solid var(--color-border-neutral)',
                   borderRadius: 8,
-                  background: isSystem ? '#f5f5f5' : '#fff',
+                  background: isSystem ? 'var(--color-disabled-bg)' : 'var(--color-bg-paper)',
+                  color: 'var(--color-text-primary)',
                   resize: 'vertical',
                   boxSizing: 'border-box',
                   lineHeight: 1.5
@@ -194,11 +204,11 @@ export default function DeckEditorModal({
             <div style={{
               flex: '1 1 320px',
               minWidth: 260,
-              background: '#fff',
-              border: '2px solid #e0e0e0',
+              background: 'var(--color-bg-surface-solid)',
+              border: '2px solid var(--color-border-neutral)',
               borderRadius: 12,
               padding: 16,
-              boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+              boxShadow: '0 2px 6px var(--color-shadow-soft)',
               display: 'flex',
               flexDirection: 'column',
               gap: 8,
@@ -207,7 +217,7 @@ export default function DeckEditorModal({
               <div style={{
                 fontSize: 11,
                 fontWeight: 600,
-                color: '#666',
+                color: 'var(--color-text-secondary)',
                 letterSpacing: 0.5,
                 textTransform: 'uppercase'
               }}>
@@ -228,9 +238,10 @@ export default function DeckEditorModal({
                   padding: '10px 12px',
                   fontSize: 13,
                   fontFamily: 'monospace',
-                  border: '2px solid #e0e0e0',
+                  border: '2px solid var(--color-border-neutral)',
                   borderRadius: 8,
-                  background: isSystem ? '#f5f5f5' : '#fff',
+                  background: isSystem ? 'var(--color-disabled-bg)' : 'var(--color-bg-paper)',
+                  color: 'var(--color-text-primary)',
                   resize: 'vertical',
                   boxSizing: 'border-box',
                   lineHeight: 1.6
@@ -239,7 +250,7 @@ export default function DeckEditorModal({
             </div>
           </div>
 
-          <div style={{ height: 1, background: '#dcd4c5', width: '100%' }} />
+          <div style={{ height: 1, background: 'var(--color-border-paper)', width: '100%' }} />
 
           <div style={{
             display: 'flex',
@@ -261,11 +272,11 @@ export default function DeckEditorModal({
               gap: 12
             }}>
               <div style={{
-                background: '#fff',
-                border: '2px solid #e0e0e0',
+                background: 'var(--color-bg-surface-solid)',
+                border: '2px solid var(--color-border-neutral)',
                 borderRadius: 10,
                 padding: 14,
-                boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+                boxShadow: '0 2px 6px var(--color-shadow-soft)',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 10,
@@ -281,7 +292,7 @@ export default function DeckEditorModal({
                   <div style={{
                     fontSize: 11,
                     fontWeight: 600,
-                    color: '#666',
+                    color: 'var(--color-text-secondary)',
                     letterSpacing: 0.5,
                     textTransform: 'uppercase'
                   }}>
@@ -292,9 +303,9 @@ export default function DeckEditorModal({
                       onClick={() => onAddVoice(deck.id)}
                       disabled={creatingVoiceId === deck.id}
                       style={{
-                        border: '1px dashed #4a90e2',
+                        border: '1px dashed var(--color-action-link)',
                         background: 'transparent',
-                        color: '#4a90e2',
+                        color: 'var(--color-action-link)',
                         padding: '6px 10px',
                         borderRadius: 6,
                         cursor: creatingVoiceId === deck.id ? 'not-allowed' : 'pointer',
@@ -308,13 +319,13 @@ export default function DeckEditorModal({
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto' }}>
                   {voices.length === 0 && (
-                    <div style={{ color: '#999', fontSize: 13, fontStyle: 'italic' }}>
+                    <div style={{ color: 'var(--color-text-muted)', fontSize: 13, fontStyle: 'italic' }}>
                       No voices in this deck yet
                     </div>
                   )}
                   {voices.map(voice => {
                     const VoiceIcon = iconMap[voice.icon as keyof typeof iconMap] || iconMap.brain;
-                    const voiceColor = COLORS[voice.color as keyof typeof COLORS]?.hex || '#4a90e2';
+                    const voiceColor = COLORS[voice.color as keyof typeof COLORS]?.hex || 'var(--color-action-link)';
                     const isSelected = selectedVoiceId === voice.id;
 
                     return (
@@ -329,7 +340,7 @@ export default function DeckEditorModal({
                           borderRadius: 8,
                           cursor: 'pointer',
                           border: isSelected ? `2px solid ${voiceColor}` : '2px solid transparent',
-                          background: isSelected ? `${voiceColor}15` : '#fafafa',
+                          background: isSelected ? `${voiceColor}15` : 'var(--color-bg-surface)',
                           transition: 'all 0.15s',
                           opacity: voice.enabled ? 1 : 0.55
                         }}
@@ -342,9 +353,9 @@ export default function DeckEditorModal({
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          color: '#fff',
+                          color: 'var(--color-text-on-action)',
                           flexShrink: 0,
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.15)'
+                          boxShadow: '0 2px 6px var(--color-shadow-medium)'
                         }}>
                           <VoiceIcon size={16} />
                         </div>
@@ -353,7 +364,7 @@ export default function DeckEditorModal({
                           minWidth: 0,
                           fontSize: 14,
                           fontWeight: isSelected ? 700 : 500,
-                          color: '#2c2c2c',
+                          color: 'var(--color-text-primary)',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap'
@@ -385,7 +396,7 @@ export default function DeckEditorModal({
               gap: 12
             }}>
               {selectedVoice ? (() => {
-                const voiceColor = COLORS[selectedVoice.color as keyof typeof COLORS]?.hex || '#4a90e2';
+                const voiceColor = COLORS[selectedVoice.color as keyof typeof COLORS]?.hex || 'var(--color-action-link)';
                 const VoiceIcon = iconMap[selectedVoice.icon as keyof typeof iconMap] || iconMap.brain;
 
                 return (
@@ -394,7 +405,7 @@ export default function DeckEditorModal({
                     style={{
                       flex: 1,
                       minHeight: 0,
-                      background: '#fff',
+                      background: 'var(--color-bg-surface-solid)',
                       border: `2px solid ${voiceColor}`,
                       borderRadius: 12,
                       padding: 18,
@@ -418,7 +429,7 @@ export default function DeckEditorModal({
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: '#fff',
+                        color: 'var(--color-text-on-action)',
                         boxShadow: `0 3px 8px ${voiceColor}40`
                       }}>
                         <VoiceIcon size={22} />
@@ -438,7 +449,7 @@ export default function DeckEditorModal({
                           flex: 1,
                           minWidth: 140,
                           border: 'none',
-                          borderBottom: '2px solid #e0e0e0',
+                          borderBottom: '2px solid var(--color-border-neutral)',
                           fontSize: 18,
                           fontWeight: 700,
                           padding: '6px 4px',
@@ -454,8 +465,9 @@ export default function DeckEditorModal({
                         style={{
                           padding: '8px 10px',
                           borderRadius: 6,
-                          border: '1px solid #ddd',
-                          background: '#fafafa',
+                          border: '1px solid var(--color-border-neutral)',
+                          background: 'var(--color-bg-paper)',
+                          color: 'var(--color-text-primary)',
                           fontSize: 12,
                           cursor: isSystem ? 'not-allowed' : 'pointer'
                         }}
@@ -472,8 +484,9 @@ export default function DeckEditorModal({
                         style={{
                           padding: '8px 10px',
                           borderRadius: 6,
-                          border: '1px solid #ddd',
-                          background: '#fafafa',
+                          border: '1px solid var(--color-border-neutral)',
+                          background: 'var(--color-bg-paper)',
+                          color: 'var(--color-text-primary)',
                           fontSize: 12,
                           cursor: isSystem ? 'not-allowed' : 'pointer'
                         }}
@@ -483,7 +496,7 @@ export default function DeckEditorModal({
                         ))}
                       </select>
 
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#333' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-text-body)' }}>
                         <input
                           type="checkbox"
                           checked={selectedVoice.enabled}
@@ -498,15 +511,44 @@ export default function DeckEditorModal({
                           onClick={() => onDeleteVoice(selectedVoice.id)}
                           style={{
                             padding: '8px 12px',
-                            background: '#fff',
-                            border: '1px solid #e0e0e0',
+                            background: 'var(--color-bg-paper)',
+                            border: '1px solid var(--color-border-neutral)',
                             borderRadius: 6,
                             cursor: 'pointer',
                             fontSize: 12,
-                            color: '#c00'
+                            color: 'var(--color-state-error)'
                           }}
                         >
                           Delete
+                        </button>
+                      )}
+
+                      {onOpenChat && (
+                        <button
+                          onClick={async () => {
+                            try {
+                              const threadId = await ensureVoiceThread(selectedVoice.id, selectedVoice.thread_id);
+                              onOpenChat(threadId, {
+                                name: selectedVoice.name,
+                                systemPrompt: selectedVoice.system_prompt,
+                                icon: selectedVoice.icon,
+                                color: selectedVoice.color,
+                              });
+                            } catch (err) {
+                              console.error('Failed to open chat thread:', err);
+                            }
+                          }}
+                          style={{
+                            padding: '8px 12px',
+                            background: 'var(--color-action-link)',
+                            border: 'none',
+                            borderRadius: 6,
+                            cursor: 'pointer',
+                            fontSize: 12,
+                            color: 'var(--color-text-on-action)'
+                          }}
+                        >
+                          Chat →
                         </button>
                       )}
                     </div>
@@ -514,7 +556,7 @@ export default function DeckEditorModal({
                     <div style={{
                       fontSize: 11,
                       fontWeight: 600,
-                      color: '#666',
+                      color: 'var(--color-text-secondary)',
                       letterSpacing: 0.5,
                       textTransform: 'uppercase'
                     }}>
@@ -536,9 +578,10 @@ export default function DeckEditorModal({
                         padding: 12,
                         fontSize: 13,
                         fontFamily: 'monospace',
-                        border: '2px solid #e0e0e0',
+                        border: '2px solid var(--color-border-neutral)',
                         borderRadius: 8,
-                        background: isSystem ? '#f5f5f5' : '#fff',
+                        background: isSystem ? 'var(--color-disabled-bg)' : 'var(--color-bg-paper)',
+                        color: 'var(--color-text-primary)',
                         resize: 'vertical',
                         boxSizing: 'border-box',
                         lineHeight: 1.6
@@ -549,11 +592,11 @@ export default function DeckEditorModal({
               })() : (
                 <div style={{
                   flex: 1,
-                  background: '#fff',
-                  border: '2px dashed #d0c4b0',
+                  background: 'var(--color-bg-surface-solid)',
+                  border: '2px dashed var(--color-border-paper)',
                   borderRadius: 12,
                   padding: 40,
-                  color: '#888',
+                  color: 'var(--color-text-muted)',
                   fontSize: 14,
                   textAlign: 'center'
                 }}>

@@ -1,3 +1,7 @@
+// [Input] Calendar storage, auth context, i18n locale, timezone utils.
+// [Output] Modal calendar popup with month grid and entry list.
+// [Pos] calendar-popup component in frontend/src/components
+// [Sync] 2026-05-29: replace all hardcoded colors with CSS tokens / color-mix for dark theme support.
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getDateLocale } from '../i18n';
@@ -191,7 +195,7 @@ export default function CalendarPopup({ onLoadEntry, onClose, currentEntryId, on
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(0,0,0,0.4)',
+        background: 'var(--color-bg-overlay)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -219,11 +223,11 @@ export default function CalendarPopup({ onLoadEntry, onClose, currentEntryId, on
           style={{
             flex: '0 0 auto',
             width: '460px',
-            background: 'linear-gradient(145deg, #fffef9 0%, #faf8f3 100%)',
-            border: '2px solid #d0c4b0',
+            background: 'var(--color-bg-paper)',
+            border: '2px solid var(--color-border-paper)',
             borderRadius: '16px',
             padding: '20px',
-            boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
+            boxShadow: '0 12px 40px var(--color-shadow-medium)',
             fontFamily: "'Excalifont', 'Xiaolai', 'Georgia', serif"
           }}
         >
@@ -243,16 +247,16 @@ export default function CalendarPopup({ onLoadEntry, onClose, currentEntryId, on
                 fontSize: '20px',
                 padding: '8px 12px',
                 borderRadius: '8px',
-                color: '#666',
+                color: 'var(--color-text-secondary)',
                 transition: 'all 0.2s'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#f0ebe0';
-                e.currentTarget.style.color = '#333';
+                e.currentTarget.style.background = 'var(--color-bg-hover)';
+                e.currentTarget.style.color = 'var(--color-text-body)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'transparent';
-                e.currentTarget.style.color = '#666';
+                e.currentTarget.style.color = 'var(--color-text-secondary)';
               }}
             >
               ‹
@@ -260,7 +264,7 @@ export default function CalendarPopup({ onLoadEntry, onClose, currentEntryId, on
             <div style={{
               fontSize: '20px',
               fontWeight: 600,
-              color: '#2c2c2c',
+              color: 'var(--color-text-primary)',
               letterSpacing: '0.5px'
             }}>
               {currentMonth.toLocaleDateString(dateLocale, { month: 'long', year: 'numeric' })}
@@ -274,16 +278,16 @@ export default function CalendarPopup({ onLoadEntry, onClose, currentEntryId, on
                 fontSize: '20px',
                 padding: '8px 12px',
                 borderRadius: '8px',
-                color: '#666',
+                color: 'var(--color-text-secondary)',
                 transition: 'all 0.2s'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#f0ebe0';
-                e.currentTarget.style.color = '#333';
+                e.currentTarget.style.background = 'var(--color-bg-hover)';
+                e.currentTarget.style.color = 'var(--color-text-body)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'transparent';
-                e.currentTarget.style.color = '#666';
+                e.currentTarget.style.color = 'var(--color-text-secondary)';
               }}
             >
               ›
@@ -302,7 +306,7 @@ export default function CalendarPopup({ onLoadEntry, onClose, currentEntryId, on
                 textAlign: 'center',
                 fontSize: '12px',
                 fontWeight: 600,
-                color: '#999',
+                color: 'var(--color-text-muted)',
                 padding: '8px 0',
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px'
@@ -332,10 +336,10 @@ export default function CalendarPopup({ onLoadEntry, onClose, currentEntryId, on
                   style={{
                     aspectRatio: '1',
                     background: day.hasEntries
-                      ? '#fff'
+                      ? 'var(--color-bg-surface-solid)'
                       : 'transparent',
                     border: isSelected
-                      ? '2px solid #000'
+                      ? '2px solid var(--color-border-focus)'
                       : 'none',
                     borderRadius: '10px',
                     cursor: 'pointer',
@@ -348,9 +352,9 @@ export default function CalendarPopup({ onLoadEntry, onClose, currentEntryId, on
                     justifyContent: 'center',
                     transition: 'all 0.2s',
                     boxShadow: day.hasEntries
-                      ? '0 2px 8px rgba(0,0,0,0.08)'
+                      ? '0 2px 8px var(--color-shadow-soft)'
                       : 'none',
-                    color: '#333',
+                    color: 'var(--color-text-body)',
                     fontWeight: day.isToday || isSelected ? 700 : 400
                   }}
                   onMouseEnter={(e) => {
@@ -372,9 +376,9 @@ export default function CalendarPopup({ onLoadEntry, onClose, currentEntryId, on
                       width: 28,
                       height: 28,
                       borderRadius: '50%',
-                      border: '2px solid #fb8c00',
-                      color: '#333',
-                      background: isSelected ? 'rgba(255,255,255,0.9)' : 'transparent'
+                      border: '2px solid var(--color-state-warning)',
+                      color: 'var(--color-text-body)',
+                      background: isSelected ? 'var(--color-bg-surface-solid)' : 'transparent'
                     }}>
                       {day.date}
                     </span>
@@ -388,7 +392,7 @@ export default function CalendarPopup({ onLoadEntry, onClose, currentEntryId, on
                         width: '5px',
                         height: '5px',
                         borderRadius: '50%',
-                        background: '#4a90d9'
+                        background: 'var(--color-action-link)'
                       }} />
                     )}
                   </button>
@@ -413,18 +417,18 @@ export default function CalendarPopup({ onLoadEntry, onClose, currentEntryId, on
             <div
               onClick={(e) => e.stopPropagation()}
               style={{
-                background: 'rgba(255,255,255,0.95)',
+                background: 'var(--color-bg-paper)',
                 borderRadius: '12px 12px 0 0',
                 padding: '16px 20px',
-                borderBottom: '1px solid #e0d4c0',
+                borderBottom: '1px solid var(--color-border-paper)',
                 backdropFilter: 'blur(8px)',
-                boxShadow: '0 -4px 20px rgba(0,0,0,0.05)'
+                boxShadow: '0 -4px 20px var(--color-shadow-soft)'
               }}
             >
               <div style={{
                 fontSize: '16px',
                 fontWeight: 600,
-                color: '#444',
+                color: 'var(--color-text-body)',
                 fontFamily: "'Excalifont', 'Xiaolai', 'Georgia', serif"
               }}>
                 {selectedDate === today
@@ -439,7 +443,7 @@ export default function CalendarPopup({ onLoadEntry, onClose, currentEntryId, on
               {selectedEntries.length > 0 && (
                 <div style={{
                   fontSize: '13px',
-                  color: '#888',
+                  color: 'var(--color-text-secondary)',
                   marginTop: '4px'
                 }}>
                   {t('calendar.entriesLabel', { count: selectedEntries.length })}
@@ -451,19 +455,19 @@ export default function CalendarPopup({ onLoadEntry, onClose, currentEntryId, on
             <div
               onClick={(e) => e.stopPropagation()}
               style={{
-                background: 'rgba(255,255,255,0.92)',
+                background: 'var(--color-bg-paper)',
                 borderRadius: '0 0 12px 12px',
                 padding: '12px',
                 flex: 1,
                 overflow: 'auto',
                 backdropFilter: 'blur(8px)',
-                boxShadow: '0 12px 40px rgba(0,0,0,0.15)'
+                boxShadow: '0 12px 40px var(--color-shadow-medium)'
               }}
             >
               {selectedEntries.length === 0 ? (
                 <div style={{
                   textAlign: 'center',
-                  color: '#999',
+                  color: 'var(--color-text-muted)',
                   padding: '32px 20px',
                   fontSize: '14px',
                   fontFamily: "'Excalifont', 'Xiaolai', 'Georgia', serif"
@@ -490,15 +494,15 @@ export default function CalendarPopup({ onLoadEntry, onClose, currentEntryId, on
                           borderRadius: '10px',
                           padding: '14px 16px',
                           background: isCurrentEntry
-                            ? 'linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%)'
-                            : '#fff',
+                            ? 'color-mix(in srgb, var(--color-state-success) 10%, var(--color-bg-surface-solid))'
+                            : 'var(--color-bg-surface-solid)',
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center',
                           gap: '12px',
                           boxShadow: isCurrentEntry
-                            ? '0 2px 12px rgba(76, 175, 80, 0.2), inset 0 0 0 2px #4CAF50'
-                            : '0 2px 8px rgba(0,0,0,0.06)',
+                            ? `0 2px 12px var(--color-shadow-soft), inset 0 0 0 2px var(--color-state-success)`
+                            : '0 2px 8px var(--color-shadow-soft)',
                           transition: 'all 0.2s',
                           minWidth: 0
                         }}
@@ -525,7 +529,7 @@ export default function CalendarPopup({ onLoadEntry, onClose, currentEntryId, on
                           }}>
                             <div style={{
                               fontSize: '12px',
-                              color: '#888',
+                              color: 'var(--color-text-secondary)',
                               fontWeight: 500,
                               flexShrink: 0
                             }}>
@@ -538,8 +542,8 @@ export default function CalendarPopup({ onLoadEntry, onClose, currentEntryId, on
                                 textTransform: 'uppercase',
                                 padding: '3px 8px',
                                 borderRadius: '999px',
-                                background: '#4CAF50',
-                                color: '#fff',
+                                background: 'var(--color-state-success)',
+                                color: 'var(--color-text-on-action)',
                                 fontWeight: 600,
                                 flexShrink: 0
                               }}>
@@ -549,7 +553,7 @@ export default function CalendarPopup({ onLoadEntry, onClose, currentEntryId, on
                           </div>
                           <div style={{
                             fontSize: '14px',
-                            color: '#333',
+                            color: 'var(--color-text-body)',
                             lineHeight: 1.4,
                             overflow: 'hidden',
                             textOverflow: 'ellipsis',
@@ -569,18 +573,18 @@ export default function CalendarPopup({ onLoadEntry, onClose, currentEntryId, on
                             padding: '6px 10px',
                             cursor: 'pointer',
                             fontSize: '12px',
-                            color: '#999',
+                            color: 'var(--color-text-muted)',
                             fontFamily: "'Excalifont', 'Xiaolai', 'Georgia', serif",
                             transition: 'all 0.2s',
                             flexShrink: 0
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#fee';
-                            e.currentTarget.style.color = '#d44';
+                            e.currentTarget.style.background = 'color-mix(in srgb, var(--color-state-danger) 12%, transparent)';
+                            e.currentTarget.style.color = 'var(--color-state-danger)';
                           }}
                           onMouseLeave={(e) => {
                             e.currentTarget.style.background = 'transparent';
-                            e.currentTarget.style.color = '#999';
+                            e.currentTarget.style.color = 'var(--color-text-muted)';
                           }}
                         >
                           {t('calendar.deleteButton')}

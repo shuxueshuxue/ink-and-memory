@@ -1,0 +1,113 @@
+# [Input] Remote SSH REMOTE_* deployment env, backend/frontend Dockerfiles, backend/.env.
+# [Output] Two-service remote Compose stack with host-published frontend/backend ports.
+# [Pos] Remote SSH Compose template in deploy/remote-ssh/
+# [Sync] 2026-06-12: pin backend container PORT to the mapped container port so env_file cannot desync uvicorn and Compose.
+# [Sync] 2026-06-13: remove obsolete version field for Docker Compose v2 compatibility.
+# [Sync] 2026-06-14: allow Claude Code nested Bash sandbox in backend Docker runtime.
+# [Sync] 2026-06-14: pass frontend/backend public URLs into backend SEO generators and frontend Vite build.
+# [Sync] 2026-06-15: remove /ink-and-memory frontend path prefix from public app URL.
+# [Sync] 2026-06-17: grant backend container the minimal Docker runtime privileges
+#                    bubblewrap needs to create mount namespaces.
+# [Sync] 2026-06-23: override local `.env` auth URLs/cookies with production
+#                    Remote SSH public origins.
+# [Sync] 2026-06-23: route backend container egress through a Mihomo TUN proxy namespace.
+# [Sync] 2026-06-24: remove backend extra_hosts because Docker forbids custom
+#                    host mappings with network_mode: service:tun-proxy.
+
+services:
+  tun-proxy:
+    image: ${REMOTE_CLASH_IMAGE:-metacubex/mihomo:latest}
+    container_name: ${REMOTE_CLASH_CONTAINER:-tun-proxy}
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - ${REMOTE_CLASH_CONFIG_FILE:-../../deploy/clash/config.yaml}:/root/.config/mihomo/config.yaml:ro
+    ports:
+      # Backend shares this network namespace, so host nginx reaches backend
+      # through tun-proxy on REMOTE_BACKEND_PORT.
+      - "${REMOTE_BACKEND_BIND_HOST:-127.0.0.1}:${REMOTE_BACKEND_PORT:-8765}:${REMOTE_BACKEND_CONTAINER_PORT:-8765}"
+      # Mihomo controller/dashboard. Keep localhost-bound unless protected.
+      - "${REMOTE_CLASH_CONTROLLER_BIND_HOST:-127.0.0.1}:${REMOTE_CLASH_CONTROLLER_PORT:-9090}:9090"
+      - "${REMOTE_CLASH_DASHBOARD_BIND_HOST:-127.0.0.1}:${REMOTE_CLASH_DASHBOARD_PORT:-3000}:3000"
+
+  ink-backend:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    image: ${REMOTE_BACKEND_IMAGE:-ink-backend:remote}
+    container_name: ${REMOTE_BACKEND_CONTAINER:-ink-backend}
+    restart: unless-stopped
+    cpus: "${REMOTE_BACKEND_CPUS:-1.0}"
+    mem_limit: "${REMOTE_BACKEND_MEMORY:-1g}"
+    # privileged: true
+    user: "0:0"
+    cap_add:
+      # bubblewrap needs CAP_SYS_ADMIN for mount namespace setup inside Docker.
+      - SYS_ADMIN
+      - SYS_PTRACE
+      - NET_ADMIN
+      - SETUID
+      - SETGID
+      - SETPCAP
+    security_opt:
+      # Claude Code's Linux Bash sandbox uses bubblewrap. Docker's default
+      # seccomp/AppArmor profiles can block mount propagation operations such
+      # as `bwrap: Failed to make / slave: Permission denied`.
+      - seccomp=unconfined
+      - apparmor=unconfined
+    network_mode: "service:tun-proxy"
+    volumes:
+      - ../../backend/data:/app/data
+      - ../../backend/models.json:/app/models.json:ro
+    env_file:
+      - ../../backend/.env
+    environment:
+      PORT: ${REMOTE_BACKEND_CONTAINER_PORT:-8765}
+      TZ: ${REMOTE_TZ:-UTC}
+      AGENT_CWD: ${REMOTE_AGENT_CWD:-/app/data/agent-workspace}
+      INK_AGENT_SANDBOX_EXTRA_ALLOW_READ: ${REMOTE_SANDBOX_EXTRA_ALLOW_READ:-/app/claude_agent:/app/libs:/app/prompts}
+      FILE_STORAGE_TYPE: ${REMOTE_FILE_STORAGE_TYPE:-local}
+      FILE_STORAGE_LOCAL_DIR: ${REMOTE_FILE_STORAGE_LOCAL_DIR:-/app/data/file-storage}
+      FILE_STORAGE_PREFIX: ${REMOTE_FILE_STORAGE_PREFIX:-uploads}
+      WEBUI_URL: ${REMOTE_FRONTEND_PUBLIC_ORIGIN:-https://ink-frontend.suoxya.com}
+      API_BASE_URL: ${REMOTE_BACKEND_PUBLIC_ORIGIN:-https://ink-backend.suoxya.com}
+      COOKIE_SECURE: ${REMOTE_COOKIE_SECURE:-true}
+      COOKIE_SAMESITE: ${REMOTE_COOKIE_SAMESITE:-none}
+      INK_CORS_ALLOW_ORIGINS: ${REMOTE_CORS_ALLOW_ORIGINS:-https://ink-frontend.suoxya.com}
+      INK_CORS_ALLOW_CREDENTIALS: ${REMOTE_CORS_ALLOW_CREDENTIALS:-true}
+      INK_PUBLIC_BASE_URL: ${REMOTE_FRONTEND_PUBLIC_ORIGIN:-https://ink-frontend.suoxya.com}
+      INK_BACKEND_PUBLIC_BASE_URL: ${REMOTE_BACKEND_PUBLIC_ORIGIN:-https://ink-backend.suoxya.com}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os, urllib.request; urllib.request.urlopen('http://localhost:' + os.environ.get('PORT', '8765') + '/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      tun-proxy:
+        condition: service_started
+
+  ink-frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_PUBLIC_SITE_URL: ${REMOTE_FRONTEND_PUBLIC_ORIGIN:-https://ink-frontend.suoxya.com}
+    image: ${REMOTE_FRONTEND_IMAGE:-ink-frontend:remote}
+    container_name: ${REMOTE_FRONTEND_CONTAINER:-ink-frontend}
+    restart: unless-stopped
+    cpus: "${REMOTE_FRONTEND_CPUS:-1.0}"
+    mem_limit: "${REMOTE_FRONTEND_MEMORY:-256m}"
+    ports:
+      - "${REMOTE_FRONTEND_BIND_HOST:-127.0.0.1}:${REMOTE_FRONTEND_PORT:-8080}:80"
+    environment:
+      BACKEND_URL: http://tun-proxy:${REMOTE_BACKEND_CONTAINER_PORT:-8765}
+      API_BASE_URL: ${REMOTE_API_BASE_URL:-https://ink-backend.suoxya.com}
+      WS_BASE_URL: ${REMOTE_WS_BASE_URL:-}
+    depends_on:
+      ink-backend:
+        condition: service_healthy

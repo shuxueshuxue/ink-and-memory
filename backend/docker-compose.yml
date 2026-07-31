@@ -1,12 +1,29 @@
-version: "3.8"
+# [Input] Published backend image, local backend data directory, models.json.
+# [Output] Reference single-backend Docker Compose service.
+# [Pos] legacy backend-only compose example in backend/
+# [Sync] 2026-06-17: grant Claude Code bubblewrap Bash sandbox runtime privileges
+#                    and persist AGENT_CWD under /app/data.
+# [Sync] 2026-06-17: remove obsolete Compose version field for Docker Compose v2.
 
 services:
   ink-backend:
     image: ghcr.io/shuxueshuxue/ink-backend:latest
     container_name: ink-backend
     restart: unless-stopped
+    # privileged: true
+    user: "0:0"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    cap_add:
+      # Claude Code's Linux Bash sandbox uses bubblewrap. Docker must allow
+      # mount namespace setup or Bash fails with:
+      # `bwrap: Failed to make / slave: Permission denied`.
+      - SYS_ADMIN
+      - SYS_PTRACE
+      - NET_ADMIN
+    security_opt:
+      - seccomp=unconfined
+      - apparmor=unconfined
     ports:
       - "127.0.0.1:8765:8765"
     volumes:
@@ -14,6 +31,7 @@ services:
       - ./models.json:/app/models.json:ro
     environment:
       BACKEND_VERSION: ghcr.io/shuxueshuxue/ink-backend:latest
+      AGENT_CWD: /app/data/agent-workspace
       HTTP_PROXY: http://host.docker.internal:7890
       HTTPS_PROXY: http://host.docker.internal:7890
       NO_PROXY: localhost,127.0.0.1,::1

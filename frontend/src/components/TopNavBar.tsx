@@ -1,22 +1,39 @@
-import { useState } from 'react';
+// [Sync] 2026-07-04: add Resource Connector navigation entry alongside the existing dashboard views.
+// [Sync] 2026-07-08: Connector navigation now opens Settings -> resource links instead of the old chat-embedded workbench.
+// [Sync] 2026-07-23: theme toggle now subscribes to the unified theme store (utils/theme), so the icon stays in sync
+//                    when the theme is changed from Settings and the first click always switches visually.
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../contexts/AuthContext';
+import { toggleTheme, getTheme, onThemeChange } from '../utils/theme';
 
 interface Props {
-  currentView: 'writing' | 'settings' | 'timeline' | 'analysis' | 'decks';
-  onViewChange: (view: 'writing' | 'settings' | 'timeline' | 'analysis' | 'decks') => void;
+  currentView: 'writing' | 'settings' | 'timeline' | 'analysis' | 'decks' | 'chat' | 'connector';
+  onViewChange: (view: 'writing' | 'settings' | 'timeline' | 'analysis' | 'decks' | 'chat' | 'connector') => void;
 }
 
 export default function LeftSidebar({ currentView, onViewChange }: Props) {
   const { user, logout } = useAuth();
   const { t } = useTranslation();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [isDark, setIsDark] = useState(() => getTheme() === 'dark');
+
+  useEffect(() => {
+    return onThemeChange((resolved) => {
+      setIsDark(resolved === 'dark');
+    });
+  }, []);
+
+  const handleToggleTheme = () => {
+    toggleTheme();
+  };
+
   const buttonStyle = (isActive: boolean) => ({
     height: '100%',
     minWidth: 120,
     padding: '0 26px',
     border: 'none',
-    background: isActive ? 'rgba(44, 44, 44, 0.08)' : 'transparent',
+    background: isActive ? 'var(--color-bg-hover)' : 'transparent',
     fontSize: 16,
     fontWeight: isActive ? 600 : 400,
     cursor: 'pointer',
@@ -24,9 +41,9 @@ export default function LeftSidebar({ currentView, onViewChange }: Props) {
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'all 0.2s',
-    color: isActive ? '#2c2c2c' : '#888',
+    color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
     position: 'relative' as const,
-    borderBottom: isActive ? '3px solid #2c2c2c' : '3px solid transparent',
+    borderBottom: isActive ? '3px solid var(--color-text-primary)' : '3px solid transparent',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
     letterSpacing: '-0.2px'
   });
@@ -38,8 +55,8 @@ export default function LeftSidebar({ currentView, onViewChange }: Props) {
       top: 0,
       right: 0,
       height: 52,
-      background: '#f8f0e6',
-      borderBottom: '1px solid #d0c4b0',
+      background: 'var(--color-bg-app)',
+      borderBottom: '1px solid var(--color-border-paper)',
       display: 'flex',
       flexDirection: 'row',
       alignItems: 'center',
@@ -58,22 +75,22 @@ export default function LeftSidebar({ currentView, onViewChange }: Props) {
         <span style={{
           fontSize: 20,
           fontWeight: 700,
-          color: '#2c2c2c',
+          color: 'var(--color-text-primary)',
           fontStyle: 'italic'
         }}>I</span>
         <span style={{
           fontWeight: 400,
-          color: '#2c2c2c'
+          color: 'var(--color-text-primary)'
         }}>nk & </span>
         <span style={{
           fontSize: 20,
           fontWeight: 700,
-          color: '#2c2c2c',
+          color: 'var(--color-text-primary)',
           fontStyle: 'italic'
         }}>M</span>
         <span style={{
           fontWeight: 400,
-          color: '#2c2c2c'
+          color: 'var(--color-text-primary)'
         }}>emory</span>
       </div>
 
@@ -88,7 +105,7 @@ export default function LeftSidebar({ currentView, onViewChange }: Props) {
           title={t('nav.writing')}
           onMouseEnter={e => {
             if (currentView !== 'writing') {
-              e.currentTarget.style.background = 'rgba(44, 44, 44, 0.04)';
+              e.currentTarget.style.background = 'var(--color-bg-hover)';
             }
           }}
           onMouseLeave={e => {
@@ -106,7 +123,7 @@ export default function LeftSidebar({ currentView, onViewChange }: Props) {
           title={t('nav.timeline')}
           onMouseEnter={e => {
             if (currentView !== 'timeline') {
-              e.currentTarget.style.background = 'rgba(44, 44, 44, 0.04)';
+              e.currentTarget.style.background = 'var(--color-bg-hover)';
             }
           }}
           onMouseLeave={e => {
@@ -124,7 +141,7 @@ export default function LeftSidebar({ currentView, onViewChange }: Props) {
           title={t('nav.analysis')}
           onMouseEnter={e => {
             if (currentView !== 'analysis') {
-              e.currentTarget.style.background = 'rgba(44, 44, 44, 0.04)';
+              e.currentTarget.style.background = 'var(--color-bg-hover)';
             }
           }}
           onMouseLeave={e => {
@@ -142,7 +159,7 @@ export default function LeftSidebar({ currentView, onViewChange }: Props) {
           title={t('nav.decks')}
           onMouseEnter={e => {
             if (currentView !== 'decks') {
-              e.currentTarget.style.background = 'rgba(44, 44, 44, 0.04)';
+              e.currentTarget.style.background = 'var(--color-bg-hover)';
             }
           }}
           onMouseLeave={e => {
@@ -153,9 +170,54 @@ export default function LeftSidebar({ currentView, onViewChange }: Props) {
         >
           {t('nav.decks')}
         </button>
+
+        <button
+          onClick={() => onViewChange('chat')}
+          style={buttonStyle(currentView === 'chat')}
+          title={t('nav.chat')}
+          onMouseEnter={e => {
+            if (currentView !== 'chat') {
+              e.currentTarget.style.background = 'var(--color-bg-hover)';
+            }
+          }}
+          onMouseLeave={e => {
+            if (currentView !== 'chat') {
+              e.currentTarget.style.background = 'transparent';
+            }
+          }}
+        >
+          {t('nav.chat')}
+        </button>
+
+      {/* Connector is no longer a standalone nav entry; it is reached via Settings -> resource links. */}
       </div>
 
       <div style={{ flex: 1 }} />
+
+      {/* Theme toggle button */}
+      <button
+        onClick={handleToggleTheme}
+        title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 6,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+          color: 'var(--color-text-secondary)',
+          fontSize: 15,
+          marginRight: 4
+        }}
+        onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg-hover)'; }}
+        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+      >
+        {isDark ? '☀️' : '🌙'}
+      </button>
 
       <button
         onClick={() => onViewChange('settings')}
@@ -166,16 +228,16 @@ export default function LeftSidebar({ currentView, onViewChange }: Props) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: currentView === 'settings' ? 'rgba(0, 0, 0, 0.08)' : 'transparent',
+          background: currentView === 'settings' ? 'var(--color-bg-hover)' : 'transparent',
           border: 'none',
           cursor: 'pointer',
           transition: 'all 0.2s',
-          color: '#666',
+          color: 'var(--color-text-secondary)',
           fontSize: 16
         }}
         onMouseEnter={e => {
           if (currentView !== 'settings') {
-            e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)';
+            e.currentTarget.style.background = 'var(--color-bg-hover)';
           }
         }}
         onMouseLeave={e => {
@@ -200,20 +262,20 @@ export default function LeftSidebar({ currentView, onViewChange }: Props) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: '#4CAF50',
+            background: 'var(--color-state-success)',
             border: 'none',
             cursor: 'pointer',
             transition: 'all 0.2s',
-            color: '#fff',
+            color: 'var(--color-text-on-action)',
             fontSize: 12,
             fontWeight: 600,
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
           }}
           onMouseEnter={e => {
-            e.currentTarget.style.background = '#45a049';
+            e.currentTarget.style.background = 'var(--color-state-success-hover)';
           }}
           onMouseLeave={e => {
-            e.currentTarget.style.background = '#4CAF50';
+            e.currentTarget.style.background = 'var(--color-state-success)';
           }}
           title="User Profile"
         >
@@ -239,22 +301,23 @@ export default function LeftSidebar({ currentView, onViewChange }: Props) {
               right: 0,
               marginTop: 8,
               width: 200,
-              background: '#fff',
-              border: '1px solid #d0c4b0',
+              background: 'var(--color-bg-surface-solid)',
+              border: '1px solid var(--color-border-paper)',
               borderRadius: 8,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              boxShadow: '0 4px 12px var(--color-shadow-medium)',
               zIndex: 999,
               overflow: 'hidden'
             }}>
               <div style={{
                 padding: '12px 16px',
-                borderBottom: '1px solid #e8e8e8',
-                fontSize: 13
+                borderBottom: '1px solid var(--color-border-neutral)',
+                fontSize: 13,
+                color: 'var(--color-text-body)'
               }}>
-                <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                <div style={{ fontWeight: 600, marginBottom: 4, color: 'var(--color-text-primary)' }}>
                   {user?.display_name || 'User'}
                 </div>
-                <div style={{ fontSize: 11, color: '#666' }}>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>
                   {user?.email}
                 </div>
               </div>
@@ -272,10 +335,11 @@ export default function LeftSidebar({ currentView, onViewChange }: Props) {
                   fontSize: 13,
                   cursor: 'pointer',
                   transition: 'background 0.2s',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto'
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto',
+                  color: 'var(--color-text-body)'
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.background = '#f5f5f5';
+                  e.currentTarget.style.background = 'var(--color-bg-hover)';
                 }}
                 onMouseLeave={e => {
                   e.currentTarget.style.background = 'transparent';

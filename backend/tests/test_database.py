@@ -29,13 +29,22 @@ def test_crud():
         print(f"  - {deck['name']} ({deck['id']}) - {deck['voice_count']} voices")
 
     print("\n--- Test 2: Get deck with voices ---")
-    deck_detail = db.get_deck_with_voices(user_id, 'introspection_deck')
+    # Seeded system decks use UUID ids (the old slug id 'introspection_deck'
+    # no longer exists); resolve the introspection deck dynamically by name.
+    introspection = next(
+        (d for d in decks if d['name'] == '内省卡组'),
+        next((d for d in decks if d['voice_count'] > 0), None),
+    )
+    assert introspection is not None, "no system deck available for CRUD test"
+    introspection_deck_id = introspection['id']
+    deck_detail = db.get_deck_with_voices(user_id, introspection_deck_id)
+    assert deck_detail is not None, f"deck {introspection_deck_id} not found"
     print(f"Introspection deck has {len(deck_detail['voices'])} voices:")
     for voice in deck_detail['voices']:
         print(f"  - {voice['name']} ({voice['id']})")
 
     print("\n--- Test 3: Fork a deck ---")
-    new_deck_id = db.fork_deck(user_id, 'introspection_deck')
+    new_deck_id = db.fork_deck(user_id, introspection_deck_id)
     print(f"Forked introspection_deck → {new_deck_id}")
 
     # Verify fork

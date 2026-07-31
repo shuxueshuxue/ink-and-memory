@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "skills": {
+    "a-stock-monitor-1-1-2": {
+      "version": "1.0.0",
+      "installedAt": 1780976489919
+    },
+    "quant-trading-cn": {
+      "version": "1.0.0",
+      "installedAt": 1780976507143
+    },
+    "hhxg-market": {
+      "version": "1.1.0",
+      "installedAt": 1780976524406
+    },
+    "investment-data": {
+      "version": "1.0.0",
+      "installedAt": 1780976545531
+    }
+  }
+}

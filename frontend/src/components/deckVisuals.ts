@@ -4,11 +4,11 @@ import {
 } from 'react-icons/fa';
 
 export const COLORS = {
-  'blue': { hex: '#4a90e2', label: 'Blue' },
-  'purple': { hex: '#9b59b6', label: 'Purple' },
-  'pink': { hex: '#e91e63', label: 'Pink' },
-  'green': { hex: '#27ae60', label: 'Green' },
-  'yellow': { hex: '#f39c12', label: 'Yellow' }
+  'blue': { hex: 'var(--color-action-link)', label: 'Blue' },
+  'purple': { hex: 'var(--color-voice-purple)', label: 'Purple' },
+  'pink': { hex: 'var(--color-voice-pink)', label: 'Pink' },
+  'green': { hex: 'var(--color-voice-green)', label: 'Green' },
+  'yellow': { hex: 'var(--color-state-warning)', label: 'Yellow' }
 };
 
 export const iconMap = {

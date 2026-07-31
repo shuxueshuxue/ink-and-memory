@@ -5,3 +5,6 @@ export { useTextCells } from './useTextCells';
 export type { UseTextCellsOptions, UseTextCellsReturn } from './useTextCells';
 export { useVoiceInput } from './useVoiceInput';
 export type { UseVoiceInputOptions, UseVoiceInputReturn } from './useVoiceInput';
+export { useCopy } from './useCopy';
+export { useDebounce } from './useDebounce';
+export { useFileUpload } from './useFileUpload';

@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="1003">
+  <rect width="780" height="1003" rx="8" fill="#282C34"/>
+  <!-- 标题栏 -->
+  <rect width="780" height="36" rx="8" fill="#21252B"/>
+  <rect y="20" width="780" height="16" fill="#21252B"/>
+  <!-- 控制点 -->
+  <circle cx="16" cy="18" r="6" fill="#FF5F56"/>
+  <circle cx="36" cy="18" r="6" fill="#FFBD2E"/>
+  <circle cx="56" cy="18" r="6" fill="#27C93F"/>
+  <!-- 标题 -->
+  <text x="390" y="23" text-anchor="middle"
+    font-family="monospace" font-size="12" fill="#5C6370">恢恢量化 · 连板天梯 &amp; 融资融券 — hhxg.top</text>
+  <!-- 内容 -->
+  <text x="20" y="71" font-family="monospace" font-size="13"><tspan fill="#61AFEF" font-weight="bold"># 连板天梯 — 2026-02-27</tspan></text>
+  <text x="20" y="90" font-family="monospace" font-size="13"><tspan fill="#ABB2BF"></tspan></text>
+  <text x="20" y="109" font-family="monospace" font-size="13"><tspan fill="#ABB2BF">最高连板: <tspan font-weight="bold" fill="#E5C07B"><tspan fill="#56B6C2">7板</tspan></tspan> — 豫能控股 (电力)</tspan></text>
+  <text x="20" y="128" font-family="monospace" font-size="13"><tspan fill="#ABB2BF">涨停总数: <tspan fill="#56B6C2">75</tspan></tspan></text>
+  <text x="20" y="147" font-family="monospace" font-size="13"><tspan fill="#ABB2BF"></tspan></text>
+  <text x="20" y="166" font-family="monospace" font-size="13"><tspan fill="#61AFEF" font-weight="bold">### 7板（1 只）</tspan></text>
+  <text x="20" y="185" font-family="monospace" font-size="13"><tspan fill="#ABB2BF">豫能控股(电力)</tspan></text>
+  <text x="20" y="204" font-family="monospace" font-size="13"><tspan fill="#ABB2BF"></tspan></text>
+  <text x="20" y="223" font-family="monospace" font-size="13"><tspan fill="#61AFEF" font-weight="bold">### 5板（1 只）</tspan></text>
+  <text x="20" y="242" font-family="monospace" font-size="13"><tspan fill="#ABB2BF">法尔胜(环保设备)</tspan></text>
+  <text x="20" y="261" font-family="monospace" font-size="13"><tspan fill="#ABB2BF"></tspan></text>
+  <text x="20" y="280" font-family="monospace" font-size="13"><tspan fill="#61AFEF" font-weight="bold">### 4板（2 只）</tspan></text>
+  <text x="20" y="299" font-family="monospace" font-size="13"><tspan fill="#ABB2BF">金正大(农化制品) / 澄星股份(农化制品)</tspan></text>
+  <text x="20" y="318" font-family="monospace" font-size="13"><tspan fill="#ABB2BF"></tspan></text>
+  <text x="20" y="337" font-family="monospace" font-size="13"><tspan fill="#61AFEF" font-weight="bold">### 3板（5 只）</tspan></text>
+  <text x="20" y="356" font-family="monospace" font-size="13"><tspan fill="#ABB2BF">赣能股份(电力) / 洪兴股份(服装家纺) / 启迪环境(环境治理) / 云南锗业(小金属) / 章源钨业(小金属)</tspan></text>
+  <text x="20" y="375" font-family="monospace" font-size="13"><tspan fill="#ABB2BF"></tspan></text>
+  <text x="20" y="394" font-family="monospace" font-size="13"><tspan fill="#61AFEF" font-weight="bold">### 2板（52 只）</tspan></text>
+  <text x="20" y="413" font-family="monospace" font-size="13"><tspan fill="#ABB2BF">大族激光(自动化设) / 江顺科技(专用设备) / 智微智能(计算机设) / 金圆股份(环境治理) / 深南电路(元件) / 悦心健康(家居用品) / 海翔药业</tspan></text>
+  <text x="20" y="432" font-family="monospace" font-size="13"><tspan fill="#ABB2BF"></tspan></text>
+  <text x="20" y="451" font-family="monospace" font-size="13"><tspan fill="#61AFEF" font-weight="bold">### 1板（65 只）</tspan></text>
+  <text x="20" y="470" font-family="monospace" font-size="13"><tspan fill="#ABB2BF">中国天楹() / 新金路() / 德龙汇能() / 高新发展() / 中钨高新() / 四川美丰() / 锡业股份() / 闽东电力()</tspan></text>
+  <text x="20" y="489" font-family="monospace" font-size="13"><tspan fill="#ABB2BF"></tspan></text>
+  <text x="20" y="508" font-family="monospace" font-size="13"><tspan fill="#61AFEF" font-weight="bold">### 晋级率</tspan></text>
+  <text x="20" y="527" font-family="monospace" font-size="13"><tspan fill="#5C6370">• </tspan><tspan fill="#ABB2BF">- <tspan fill="#56B6C2">2板</tspan>→<tspan fill="#56B6C2">3板</tspan>: <tspan fill="#56B6C2">9.6%</tspan></tspan></text>
+  <text x="20" y="546" font-family="monospace" font-size="13"><tspan fill="#5C6370">• </tspan><tspan fill="#ABB2BF">- <tspan fill="#56B6C2">3板</tspan>→<tspan fill="#56B6C2">4板</tspan>: <tspan fill="#56B6C2">60.0%</tspan></tspan></text>
+  <text x="20" y="565" font-family="monospace" font-size="13"><tspan fill="#5C6370">• </tspan><tspan fill="#ABB2BF">- <tspan fill="#56B6C2">4板</tspan>→<tspan fill="#56B6C2">5板</tspan>: <tspan fill="#56B6C2">50.0%</tspan></tspan></text>
+  <text x="20" y="584" font-family="monospace" font-size="13"><tspan fill="#5C6370">• </tspan><tspan fill="#ABB2BF">- <tspan fill="#56B6C2">7板</tspan>→<tspan fill="#56B6C2">8板</tspan>: <tspan fill="#56B6C2">100.0%</tspan></tspan></text>
+  <text x="20" y="603" font-family="monospace" font-size="13"><tspan fill="#ABB2BF"></tspan></text>
+  <text x="20" y="622" font-family="monospace" font-size="13"><tspan fill="#ABB2BF">────────────────────────────────────────────────────────────</tspan></text>
+  <text x="20" y="641" font-family="monospace" font-size="13"><tspan fill="#ABB2BF"></tspan></text>
+  <text x="20" y="660" font-family="monospace" font-size="13"><tspan fill="#61AFEF" font-weight="bold"># 融资融券市场总览（近 7 个交易日）</tspan></text>
+  <text x="20" y="679" font-family="monospace" font-size="13"><tspan fill="#ABB2BF"></tspan></text>
+  <text x="20" y="698" font-family="monospace" font-size="13"><tspan fill="#ABB2BF">区间: <tspan fill="#56B6C2">2026-02-11</tspan> ~ <tspan fill="#56B6C2">2026-02-26</tspan></tspan></text>
+  <text x="20" y="717" font-family="monospace" font-size="13"><tspan fill="#ABB2BF"></tspan></text>
+  <text x="20" y="736" font-family="monospace" font-size="13"><tspan fill="#ABB2BF">最新融资余额: <tspan font-weight="bold" fill="#E5C07B"><tspan fill="#56B6C2">26382</tspan> 亿</tspan></tspan></text>
+  <text x="20" y="755" font-family="monospace" font-size="13"><tspan fill="#ABB2BF">最新融券余额: <tspan font-weight="bold" fill="#E5C07B"><tspan fill="#56B6C2">170.4</tspan> 亿</tspan></tspan></text>
+  <text x="20" y="774" font-family="monospace" font-size="13"><tspan fill="#ABB2BF"></tspan></text>
+  <text x="20" y="793" font-family="monospace" font-size="13"><tspan fill="#ABB2BF"><tspan fill="#56B6C2">7</tspan> 日融资变化: <tspan font-weight="bold" fill="#E5C07B">+<tspan fill="#56B6C2">225.8</tspan> 亿</tspan></tspan></text>
+  <text x="20" y="812" font-family="monospace" font-size="13"><tspan fill="#ABB2BF"><tspan fill="#56B6C2">7</tspan> 日融券变化: <tspan font-weight="bold" fill="#E5C07B">+<tspan fill="#56B6C2">4.3</tspan> 亿</tspan></tspan></text>
+  <text x="20" y="831" font-family="monospace" font-size="13"><tspan fill="#ABB2BF"></tspan></text>
+  <text x="20" y="850" font-family="monospace" font-size="13"><tspan fill="#61AFEF" font-weight="bold">### 每日余额</tspan></text>
+  <text x="20" y="869" font-family="monospace" font-size="13"><tspan fill="#5C6370">|</tspan><tspan fill="#ABB2BF">  日期  </tspan><tspan fill="#5C6370">|</tspan><tspan fill="#ABB2BF">  融资余额(亿)  </tspan><tspan fill="#5C6370">|</tspan><tspan fill="#ABB2BF">  融券余额(亿)  </tspan><tspan fill="#5C6370">|</tspan><tspan fill="#5C6370">|</tspan></text>
+  <text x="20" y="888" font-family="monospace" font-size="13"><tspan fill="#5C6370">|------|-------------|-------------|</tspan></text>
+  <text x="20" y="907" font-family="monospace" font-size="13"><tspan fill="#5C6370">|</tspan><tspan fill="#ABB2BF">  <tspan fill="#56B6C2">2026-02-11</tspan>  </tspan><tspan fill="#5C6370">|</tspan><tspan fill="#ABB2BF">  <tspan fill="#56B6C2">26156</tspan>  </tspan><tspan fill="#5C6370">|</tspan><tspan fill="#ABB2BF">  <tspan fill="#56B6C2">166.1</tspan>  </tspan><tspan fill="#5C6370">|</tspan><tspan fill="#5C6370">|</tspan></text>
+  <text x="20" y="926" font-family="monospace" font-size="13"><tspan fill="#5C6370">|</tspan><tspan fill="#ABB2BF">  <tspan fill="#56B6C2">2026-02-12</tspan>  </tspan><tspan fill="#5C6370">|</tspan><tspan fill="#ABB2BF">  <tspan fill="#56B6C2">26172</tspan>  </tspan><tspan fill="#5C6370">|</tspan><tspan fill="#ABB2BF">  <tspan fill="#56B6C2">162.6</tspan>  </tspan><tspan fill="#5C6370">|</tspan><tspan fill="#5C6370">|</tspan></text>
+  <text x="20" y="945" font-family="monospace" font-size="13"><tspan fill="#5C6370">|</tspan><tspan fill="#ABB2BF">  <tspan fill="#56B6C2">2026-02-24</tspan>  </tspan><tspan fill="#5C6370">|</tspan><tspan fill="#ABB2BF">  <tspan fill="#56B6C2">25942</tspan>  </tspan><tspan fill="#5C6370">|</tspan><tspan fill="#ABB2BF">  <tspan fill="#56B6C2">164.7</tspan>  </tspan><tspan fill="#5C6370">|</tspan><tspan fill="#5C6370">|</tspan></text>
+  <text x="20" y="964" font-family="monospace" font-size="13"><tspan fill="#5C6370">|</tspan><tspan fill="#ABB2BF">  <tspan fill="#56B6C2">2026-02-25</tspan>  </tspan><tspan fill="#5C6370">|</tspan><tspan fill="#ABB2BF">  <tspan fill="#56B6C2">26179</tspan>  </tspan><tspan fill="#5C6370">|</tspan><tspan fill="#ABB2BF">  <tspan fill="#56B6C2">167.0</tspan>  </tspan><tspan fill="#5C6370">|</tspan><tspan fill="#5C6370">|</tspan></text>
+  <text x="20" y="983" font-family="monospace" font-size="13"><tspan fill="#5C6370">|</tspan><tspan fill="#ABB2BF">  <tspan fill="#56B6C2">2026-02-26</tspan>  </tspan><tspan fill="#5C6370">|</tspan><tspan fill="#ABB2BF">  <tspan fill="#56B6C2">26382</tspan>  </tspan><tspan fill="#5C6370">|</tspan><tspan fill="#ABB2BF">  <tspan fill="#56B6C2">170.4</tspan>  </tspan><tspan fill="#5C6370">|</tspan><tspan fill="#5C6370">|</tspan></text>
+</svg>

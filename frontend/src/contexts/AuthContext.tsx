@@ -1,3 +1,9 @@
+// [Input] Runtime API base config, auth token storage, and backend auth/profile endpoints.
+// [Output] React auth context with login/register/logout/profile verification helpers.
+// [Pos] frontend auth context node
+// [Sync] 2026-06-12: use centralized API_BASE so deployed frontend can call backend cross-origin.
+// [Sync] 2026-06-23: consume Google OAuth callback access_token fragments and
+//                    expose backend-driven Google login/logout helpers.
 /**
  * Authentication context and hooks
  *
@@ -7,8 +13,7 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { STORAGE_KEYS } from '../constants/storageKeys';
-
-const API_BASE = '/ink-and-memory';
+import { API_BASE, apiUrl } from '../lib/apiBase';
 
 interface User {
   id: number;
@@ -21,6 +26,7 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => void;
   register: (email: string, password: string, displayName?: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
@@ -35,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUserProfile = async (authToken: string) => {
     const res = await fetch(`${API_BASE}/api/me`, {
+      credentials: 'include',
       headers: {
         'Authorization': `Bearer ${authToken}`
       }
@@ -49,10 +56,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Load token from localStorage on mount
   useEffect(() => {
-    const savedToken = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const oauthToken = fragment.get('access_token');
+    if (oauthToken) {
+      localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, oauthToken);
+      window.history.replaceState(null, document.title, window.location.pathname + window.location.search);
+    }
+
+    const savedToken = oauthToken || localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
     if (savedToken) {
       // Verify token by fetching user info
       fetch(`${API_BASE}/api/me`, {
+        credentials: 'include',
         headers: {
           'Authorization': `Bearer ${savedToken}`
         }
@@ -77,9 +92,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const loginWithGoogle = () => {
+    const returnTo = `${window.location.pathname}${window.location.search}`;
+    window.location.href = apiUrl(`/oauth/google/login?return_to=${encodeURIComponent(returnTo)}`);
+  };
+
   const login = async (email: string, password: string) => {
     const response = await fetch(`${API_BASE}/api/login`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json'
       },
@@ -109,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (email: string, password: string, displayName?: string) => {
     const response = await fetch(`${API_BASE}/api/register`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json'
       },
@@ -139,6 +161,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    const activeToken = token || localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+    fetch(`${API_BASE}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: activeToken ? { 'Authorization': `Bearer ${activeToken}` } : undefined
+    }).catch(() => {
+      // Local logout should still complete when the network request fails.
+    });
     setUser(null);
     setToken(null);
     localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
@@ -151,6 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         token,
         isLoading,
         login,
+        loginWithGoogle,
         register,
         logout,
         isAuthenticated: !!user && !!token

@@ -1,0 +1,94 @@
+# [Input] Local Docker build context, backend/.env, and optional public URL env overrides.
+# [Output] Two-container local stack with frontend SEO build URL and backend public app URL configured.
+# [Pos] root local Docker Compose stack
+# [Sync] 2026-06-14: pass public app/API URLs into frontend build and backend SEO generators.
+# [Sync] 2026-06-15: remove /ink-and-memory frontend path prefix from local Compose URLs.
+# [Sync] 2026-06-17: grant backend container the Docker runtime privileges required by
+#                    Claude Code's bubblewrap Bash sandbox and persist AGENT_CWD.
+# [Sync] 2026-06-17: remove obsolete Compose version field for Docker Compose v2.
+# [Sync] 2026-06-23: route backend container egress through a Mihomo TUN proxy namespace.
+# [Sync] 2026-06-24: remove backend extra_hosts because Docker forbids custom
+#                    host mappings with network_mode: service:tun-proxy.
+
+services:
+  # ── Mihomo TUN proxy (backend network namespace) ───────────────────────────
+  tun-proxy:
+    image: ${CLASH_IMAGE:-metacubex/mihomo:latest}
+    container_name: ${CLASH_CONTAINER:-tun-proxy}
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    volumes:
+      - ${CLASH_CONFIG_FILE:-./deploy/clash/config.yaml}:/root/.config/mihomo/config.yaml:ro
+    ports:
+      # Backend shares this network namespace, so publish backend here.
+      - "${CLASH_BACKEND_BIND_HOST:-127.0.0.1}:${CLASH_BACKEND_PORT:-8765}:8765"
+      # Mihomo controller/dashboard. Keep localhost-bound unless protected.
+      - "${CLASH_CONTROLLER_BIND_HOST:-127.0.0.1}:${CLASH_CONTROLLER_PORT:-9090}:9090"
+      - "${CLASH_DASHBOARD_BIND_HOST:-127.0.0.1}:${CLASH_DASHBOARD_PORT:-3000}:3000"
+
+  # ── Backend (FastAPI + uvicorn) ────────────────────────────────────────────
+  ink-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: ink-backend:local
+    container_name: ink-backend
+    restart: unless-stopped
+    # privileged: true
+    user: "0:0"
+    cap_add:
+      # Claude Code's Linux Bash sandbox uses bubblewrap. Docker must allow
+      # mount namespace setup or Bash fails with:
+      # `bwrap: Failed to make / slave: Permission denied`.
+      - SYS_ADMIN
+      - SYS_PTRACE
+      - NET_ADMIN
+    security_opt:
+      - seccomp=unconfined
+      - apparmor=unconfined
+    network_mode: "service:tun-proxy"
+    volumes:
+      - ./backend/data:/app/data
+      - ./backend/models.json:/app/models.json:ro
+    env_file:
+      - ./backend/.env
+    environment:
+      TZ: UTC
+      AGENT_CWD: /app/data/agent-workspace
+      INK_PUBLIC_BASE_URL: ${FRONTEND_PUBLIC_SITE_URL:-http://localhost}
+      INK_BACKEND_PUBLIC_BASE_URL: ${BACKEND_PUBLIC_SITE_URL:-http://127.0.0.1:8765/}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8765/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      tun-proxy:
+        condition: service_started
+
+  # ── Frontend (nginx serving Vite build + API proxy) ────────────────────────
+  ink-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_PUBLIC_SITE_URL: ${FRONTEND_PUBLIC_SITE_URL:-http://localhost}
+    image: ink-frontend:local
+    container_name: ink-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    environment:
+      # nginx.conf.template uses this to proxy /api/ and /polycli/ requests.
+      # Backend shares tun-proxy's network namespace when TUN is enabled.
+      BACKEND_URL: http://tun-proxy:8765
+      # runtime-config.js uses this browser-facing URL for direct CORS requests.
+      API_BASE_URL: http://127.0.0.1:8765
+    depends_on:
+      ink-backend:
+        condition: service_healthy

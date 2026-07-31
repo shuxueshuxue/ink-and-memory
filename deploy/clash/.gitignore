@@ -1,0 +1,5 @@
+*
+!.gitignore
+!.folder.md
+!README.md
+!config.tun-snippet.yaml

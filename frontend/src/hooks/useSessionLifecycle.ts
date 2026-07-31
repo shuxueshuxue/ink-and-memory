@@ -1,10 +1,17 @@
+// [Input] Auth state, browser timezone, editor engine, session API helpers, and voice preference setters.
+// [Output] Provide editor session lifecycle state, persistence helpers, and current user_session metadata.
+// [Pos] session-lifecycle hook in frontend/src/hooks
+// [Sync] 2026-06-01: expose current user_session.labels for the writing view StateChooser.
+// [Sync] 2026-06-14: skip one automatic save after remote Agent-write session reload.
+// [Sync] 2026-06-14: avoid scheduling auto-save debounce when the editor content signature is unchanged.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { EditorEngine } from '../engine/EditorEngine';
 import type { EditorState, TextCell } from '../engine/EditorEngine';
 import { STORAGE_KEYS } from '../constants/storageKeys';
+import { EDIT_SESSION_AUTO_SAVE_DEBOUNCE_MS } from '../constants/sessionSync';
 import { getLocalDayKey, getTodayKeyInTimezone } from '../utils/timezone';
 import { saveMetaPrompt, getStateConfig as loadStateConfig } from '../utils/voiceStorage';
-import type { VoiceConfig } from '../api/voiceApi';
+import type { SessionLabels, StateConfig, VoiceConfig } from '../api/voiceApi';
 
 function createSessionId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -13,8 +20,35 @@ function createSessionId() {
   return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
+function getEditorStateContentSignature(editorState: EditorState): string {
+  return JSON.stringify({
+    cells: editorState.cells,
+    commentors: editorState.commentors,
+    tasks: editorState.tasks,
+    weightPath: editorState.weightPath,
+    overlappedPhrases: editorState.overlappedPhrases,
+    notFoundPhrases: editorState.notFoundPhrases,
+    selectedState: editorState.selectedState ?? null,
+  });
+}
+
+type LegacyEditorState = EditorState & {
+  currentEntryId?: string;
+  sessionId?: string;
+};
+
+function collectTextCellContent(editorState: EditorState): Map<string, string> {
+  const texts = new Map<string, string>();
+  editorState.cells
+    ?.filter((cell): cell is TextCell => cell.type === 'text')
+    .forEach((cell) => {
+      texts.set(cell.id, cell.content || '');
+    });
+  return texts;
+}
+
 type SetVoiceConfigs = React.Dispatch<React.SetStateAction<Record<string, VoiceConfig>>>;
-type SetStateConfig = React.Dispatch<React.SetStateAction<any>>;
+type SetStateConfig = React.Dispatch<React.SetStateAction<StateConfig>>;
 
 interface UseSessionLifecycleParams {
   isAuthenticated: boolean;
@@ -35,14 +69,37 @@ export function useSessionLifecycle({
   const [selectedState, setSelectedState] = useState<string | null>(null);
   const [selectedStateLoading, setSelectedStateLoading] = useState(true);
   const [userTimezone, setUserTimezone] = useState(browserTimezone);
+  const [currentSessionLabels, setCurrentSessionLabels] = useState<SessionLabels>([]);
 
   const ensuredSessionForDayRef = useRef<string | null>(null);
   const userTimezoneRef = useRef(userTimezone);
   const timezoneSyncRef = useRef<string | null>(null);
+  const latestStateRef = useRef<EditorState | null>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingAutoSaveSignatureRef = useRef<string | null>(null);
+  const lastPersistedSessionSignatureRef = useRef<string | null>(null);
+
+  latestStateRef.current = state;
 
   useEffect(() => {
     userTimezoneRef.current = userTimezone;
   }, [userTimezone]);
+
+  const clearAutoSaveTimer = useCallback(() => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    pendingAutoSaveSignatureRef.current = null;
+  }, []);
+
+  const markSessionPersisted = useCallback((editorState: EditorState) => {
+    const signature = getEditorStateContentSignature(editorState);
+    lastPersistedSessionSignatureRef.current = signature;
+    if (pendingAutoSaveSignatureRef.current === signature) {
+      pendingAutoSaveSignatureRef.current = null;
+    }
+  }, []);
 
   const ensureStateForPersistence = useCallback((): EditorState | null => {
     if (!state) {
@@ -67,6 +124,9 @@ export function useSessionLifecycle({
     const { saveSession } = await import('../api/voiceApi');
     const idToSave = editorState.id || createSessionId();
     await saveSession(idToSave, editorState, line);
+    markSessionPersisted(
+      editorState.id === idToSave ? editorState : { ...editorState, id: idToSave }
+    );
 
     if (engineRef.current) {
       const liveId = engineRef.current.getState().id;
@@ -80,7 +140,7 @@ export function useSessionLifecycle({
       }
     }
     return idToSave;
-  }, [getFirstLineFromState]);
+  }, [getFirstLineFromState, markSessionPersisted]);
 
   const persistSessionImmediately = useCallback(async (editorState: EditorState) => {
     if (!isAuthenticated) return;
@@ -123,6 +183,7 @@ export function useSessionLifecycle({
     engineRef.current.loadState(blankState);
     setState(blankState);
     setLocalTexts(new Map());
+    setCurrentSessionLabels([]);
 
     if (!isAuthenticated) {
       localStorage.setItem(STORAGE_KEYS.EDITOR_STATE, JSON.stringify(blankState));
@@ -140,12 +201,8 @@ export function useSessionLifecycle({
 
       if (hasContent) {
         try {
-          const firstTextCell = workingState.cells.find(c => c.type === 'text') as TextCell | undefined;
-          const firstLine = firstTextCell?.content.split('\n')[0].trim() || 'Untitled';
-
-          const { saveSession } = await import('../api/voiceApi');
-          const sessionId = workingState.id || createSessionId();
-          await saveSession(sessionId, workingState, firstLine);
+          const firstLine = getFirstLineFromState(workingState);
+          await saveSessionToDatabase(workingState, firstLine);
         } catch (error) {
           console.error('❌ Failed to save current session:', error);
         }
@@ -156,12 +213,13 @@ export function useSessionLifecycle({
     engineRef.current.loadState(emptyState);
     setState(emptyState);
     setLocalTexts(new Map());
+    setCurrentSessionLabels([]);
 
     if (!isAuthenticated) {
       localStorage.removeItem(STORAGE_KEYS.EDITOR_STATE);
       localStorage.removeItem(STORAGE_KEYS.SELECTED_STATE);
     }
-  }, [buildBlankState, isAuthenticated, state]);
+  }, [buildBlankState, getFirstLineFromState, isAuthenticated, saveSessionToDatabase, state]);
 
   const confirmStartFresh = useCallback(async () => {
     if (!engineRef.current) return;
@@ -170,11 +228,13 @@ export function useSessionLifecycle({
     engineRef.current.loadState(emptyState);
     setState(emptyState);
     setLocalTexts(new Map());
+    setCurrentSessionLabels([]);
 
     if (isAuthenticated) {
       try {
         const { saveSession } = await import('../api/voiceApi');
         await saveSession(emptyState.id, emptyState);
+        markSessionPersisted(emptyState);
       } catch (error) {
         console.error('Failed to save new session:', error);
       }
@@ -182,7 +242,7 @@ export function useSessionLifecycle({
       localStorage.removeItem(STORAGE_KEYS.EDITOR_STATE);
       localStorage.removeItem(STORAGE_KEYS.SELECTED_STATE);
     }
-  }, [buildBlankState, isAuthenticated]);
+  }, [buildBlankState, isAuthenticated, markSessionPersisted]);
 
   const handleSaveToday = useCallback(async () => {
     if (!engineRef.current) return;
@@ -193,14 +253,14 @@ export function useSessionLifecycle({
         position: fixed;
         top: 70px;
         right: 20px;
-        background: #f44336;
+        background: var(--color-state-error);
         color: white;
         padding: 12px 20px;
         borderRadius: 6px;
         fontSize: 14px;
         fontFamily: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto;
         zIndex: 10000;
-        boxShadow: 0 4px 12px rgba(0,0,0,0.15);
+        boxShadow: 0 4px 12px var(--color-shadow-medium);
       `;
       document.body.appendChild(toast);
       setTimeout(() => {
@@ -223,14 +283,14 @@ export function useSessionLifecycle({
         position: fixed;
         top: 70px;
         right: 20px;
-        background: #4CAF50;
+        background: var(--color-state-success);
         color: white;
         padding: 12px 20px;
         borderRadius: 6px;
         fontSize: 14px;
         fontFamily: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto;
         zIndex: 10000;
-        boxShadow: 0 4px 12px rgba(0,0,0,0.15);
+        boxShadow: 0 4px 12px var(--color-shadow-medium);
       `;
       document.body.appendChild(toast);
       setTimeout(() => {
@@ -284,6 +344,7 @@ export function useSessionLifecycle({
       initialState.createdAt = new Date().toISOString();
       setState(initialState);
     }
+    markSessionPersisted(initialState);
 
     engine.subscribe((newState) => {
       setState({ ...newState });
@@ -300,7 +361,7 @@ export function useSessionLifecycle({
     return () => {
       unsubscribeBlankReset();
     };
-  }, [isAuthenticated, persistSessionImmediately]);
+  }, [isAuthenticated, markSessionPersisted, persistSessionImmediately]);
 
   useEffect(() => {
     const loadInitialState = async () => {
@@ -312,8 +373,9 @@ export function useSessionLifecycle({
 
             const sessions = await listSessions(userTimezoneRef.current);
 
-            let sessionToLoad = null;
+            let sessionToLoad: LegacyEditorState | null = null;
             let loadedSessionId: string | undefined = undefined;
+            let loadedSessionLabels: SessionLabels = [];
             let startedFreshForToday = false;
             const currentSessionId = 'current-session';
             const currentSession = sessions.find(s => s.id === currentSessionId);
@@ -322,6 +384,7 @@ export function useSessionLifecycle({
               const fullSession = await getSession(currentSessionId);
               sessionToLoad = fullSession.editor_state;
               loadedSessionId = currentSessionId;
+              loadedSessionLabels = fullSession.labels;
             } else if (sessions.length > 0) {
               const mostRecent = sessions.sort((a, b) =>
                 new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
@@ -335,6 +398,7 @@ export function useSessionLifecycle({
                 const fullSession = await getSession(mostRecent.id);
                 sessionToLoad = fullSession.editor_state;
                 loadedSessionId = mostRecent.id;
+                loadedSessionLabels = fullSession.labels;
               } else {
                 console.log(`📅 New day detected. Last session was from ${sessionDate}, today is ${today}. Starting fresh.`);
                 if (engineRef.current) {
@@ -354,6 +418,7 @@ export function useSessionLifecycle({
                   engineRef.current.loadState(blankState);
                   setState(blankState);
                   setLocalTexts(new Map());
+                  setCurrentSessionLabels([]);
                   ensuredSessionForDayRef.current = today;
                   startedFreshForToday = true;
                   // @@@ New Day Guard - hand the fresh state to the loader so nothing older overwrites it below
@@ -370,18 +435,16 @@ export function useSessionLifecycle({
             if (sessionToLoad && loadedSessionId) {
               const normalizedState: EditorState = {
                 ...sessionToLoad,
-                id: sessionToLoad.id || (sessionToLoad as any)?.currentEntryId || (sessionToLoad as any)?.sessionId || loadedSessionId
+                id: sessionToLoad.id || sessionToLoad.currentEntryId || sessionToLoad.sessionId || loadedSessionId
               };
               engineRef.current?.loadState(normalizedState);
+              markSessionPersisted(normalizedState);
               setState(engineRef.current?.getState() || normalizedState);
-
-              const texts = new Map<string, string>();
-              sessionToLoad.cells?.filter((c: any) => c.type === 'text').forEach((c: any) => {
-                texts.set(c.id, c.content || '');
-              });
-              setLocalTexts(texts);
+              setCurrentSessionLabels(loadedSessionLabels);
+              setLocalTexts(collectTextCellContent(sessionToLoad));
             } else if (!startedFreshForToday) {
               setState(engineRef.current?.getState() || null);
+              setCurrentSessionLabels([]);
             }
 
             try {
@@ -412,7 +475,7 @@ export function useSessionLifecycle({
                   setSelectedState(null);
                 }
               }
-            } catch (err) {
+            } catch {
               console.log('No preferences found, using defaults');
             }
           } catch (error) {
@@ -423,20 +486,17 @@ export function useSessionLifecycle({
           const saved = localStorage.getItem(STORAGE_KEYS.EDITOR_STATE);
           if (saved) {
             try {
-              const parsed = JSON.parse(saved);
+              const parsed = JSON.parse(saved) as EditorState;
               engineRef.current?.loadState(parsed);
               setState(engineRef.current?.getState() || parsed);
-
-              const texts = new Map<string, string>();
-              parsed.cells?.filter((c: any) => c.type === 'text').forEach((c: any) => {
-                texts.set(c.id, c.content || '');
-              });
-              setLocalTexts(texts);
+              setCurrentSessionLabels([]);
+              setLocalTexts(collectTextCellContent(parsed));
             } catch (e) {
               console.error('Failed to load saved state:', e);
             }
           } else {
             setState(engineRef.current?.getState() || null);
+            setCurrentSessionLabels([]);
           }
 
           const savedState = localStorage.getItem(STORAGE_KEYS.SELECTED_STATE);
@@ -462,7 +522,7 @@ export function useSessionLifecycle({
     };
 
     loadInitialState();
-  }, [browserTimezone, isAuthenticated, setStateConfig, setVoiceConfigs]);
+  }, [browserTimezone, isAuthenticated, markSessionPersisted, persistSessionImmediately, setStateConfig, setVoiceConfigs]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -484,23 +544,68 @@ export function useSessionLifecycle({
   }, [isAuthenticated, selectedState, startDetachedBlankSession, userTimezone]);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) {
+      clearAutoSaveTimer();
+      return;
+    }
+
+    if (engineRef.current?.consumeLastLoadSource() === 'remote') {
+      const remoteState = state ?? engineRef.current?.getState();
+      if (remoteState) {
+        markSessionPersisted(remoteState);
+      }
+      clearAutoSaveTimer();
+      return;
+    }
+
+    if (!state) {
+      clearAutoSaveTimer();
+      return;
+    }
+
+    const currentSignature = getEditorStateContentSignature(state);
+    if (currentSignature === lastPersistedSessionSignatureRef.current) {
+      clearAutoSaveTimer();
+      return;
+    }
+
+    if (currentSignature === pendingAutoSaveSignatureRef.current) {
+      return;
+    }
+
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    pendingAutoSaveSignatureRef.current = currentSignature;
 
     const autoSaveTimer = setTimeout(async () => {
-      const stateSnapshot = ensureStateForPersistence();
-      if (!stateSnapshot) return;
+      autoSaveTimerRef.current = null;
+      const stateSnapshot = latestStateRef.current;
+      if (!stateSnapshot) {
+        pendingAutoSaveSignatureRef.current = null;
+        return;
+      }
+
+      const snapshotSignature = getEditorStateContentSignature(stateSnapshot);
+      if (snapshotSignature === lastPersistedSessionSignatureRef.current) {
+        pendingAutoSaveSignatureRef.current = null;
+        return;
+      }
 
       if (engineRef.current) {
         const liveId = engineRef.current.getState().id;
         const snapshotId = stateSnapshot.id;
         if (liveId && snapshotId && liveId !== snapshotId) {
           console.warn(`✋ Auto-save aborted: timer captured ${snapshotId} but editor is now on ${liveId}`);
+          pendingAutoSaveSignatureRef.current = null;
           return;
         }
       }
 
       if (!stateSnapshot.id) {
         console.error('BUG: session id should always be defined after engine init');
+        pendingAutoSaveSignatureRef.current = null;
         return;
       }
 
@@ -510,11 +615,18 @@ export function useSessionLifecycle({
         console.log('Auto-saved to database');
       } catch (error) {
         console.error('Auto-save failed:', error);
+      } finally {
+        if (pendingAutoSaveSignatureRef.current === snapshotSignature) {
+          pendingAutoSaveSignatureRef.current = null;
+        }
       }
-    }, 3000);
+    }, EDIT_SESSION_AUTO_SAVE_DEBOUNCE_MS);
+    autoSaveTimerRef.current = autoSaveTimer;
+  }, [clearAutoSaveTimer, getFirstLineFromState, isAuthenticated, markSessionPersisted, saveSessionToDatabase, state]);
 
-    return () => clearTimeout(autoSaveTimer);
-  }, [ensureStateForPersistence, getFirstLineFromState, isAuthenticated, saveSessionToDatabase, state]);
+  useEffect(() => {
+    return () => clearAutoSaveTimer();
+  }, [clearAutoSaveTimer]);
 
   useEffect(() => {
     setStateConfig(loadStateConfig());
@@ -526,6 +638,8 @@ export function useSessionLifecycle({
     setState,
     localTexts,
     setLocalTexts,
+    currentSessionLabels,
+    setCurrentSessionLabels,
     selectedState,
     setSelectedState,
     selectedStateLoading,

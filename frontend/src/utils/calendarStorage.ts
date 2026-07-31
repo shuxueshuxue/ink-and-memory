@@ -6,6 +6,7 @@ export interface CalendarEntry {
   timestamp: number;
   state: EditorState;
   firstLine: string;
+  labels?: string[];
 }
 
 export interface CalendarData {

@@ -1,17 +1,130 @@
 <!doctype html>
 <html lang="en">
+  <!--
+    [Input] Vite base URL, SEO_PUBLIC_* replacements from vite.config.ts, and static public assets.
+    [Output] Initial HTML metadata, schema markup, and noscript-only product overview for non-JS clients.
+    [Pos] frontend SPA HTML shell
+    [Sync] 2026-06-14: add Codex SEO metadata, JSON-LD, Open Graph, and crawlable fallback content.
+    [Sync] 2026-06-25: move fallback product overview out of #root to prevent first-paint SEO text flash.
+  -->
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Ink & Memory</title>
+    <title>Ink & Memory | AI Journaling Studio for Reflective Writing</title>
+    <meta
+      name="description"
+      content="Ink & Memory is a bilingual AI journaling studio for reflective writing, inner voice feedback, visual memory timelines, and personal pattern discovery."
+    />
+    <meta
+      name="keywords"
+      content="AI journaling, reflective writing, bilingual journal, personal knowledge, inner voice feedback, visual diary, memory timeline"
+    />
+    <meta name="author" content="Ink & Memory" />
+    <meta name="robots" content="index,follow,max-image-preview:large" />
+    <meta name="theme-color" content="#f5efe6" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="application-name" content="Ink & Memory" />
+    <meta name="apple-mobile-web-app-title" content="Ink & Memory" />
+    <link rel="canonical" href="%SEO_PUBLIC_SITE_URL%" />
+    <link rel="icon" type="image/png" href="%BASE_URL%placeholder-memory.png" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Ink & Memory" />
+    <meta property="og:title" content="Ink & Memory | AI Journaling Studio" />
+    <meta
+      property="og:description"
+      content="Write, reflect, and discover patterns with a bilingual AI journaling studio that turns inner voices into thoughtful writing feedback."
+    />
+    <meta property="og:url" content="%SEO_PUBLIC_SITE_URL%" />
+    <meta property="og:image" content="%SEO_PUBLIC_IMAGE_URL%" />
+    <meta property="og:image:alt" content="Ink & Memory reflective journaling interface" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="zh_CN" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Ink & Memory | AI Journaling Studio" />
+    <meta
+      name="twitter:description"
+      content="A bilingual AI journaling studio for reflective writing, inner voice feedback, and visual memory timelines."
+    />
+    <meta name="twitter:image" content="%SEO_PUBLIC_IMAGE_URL%" />
+
+    <script src="%BASE_URL%runtime-config.js?runtime=1"></script>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "Organization",
+            "name": "Ink & Memory",
+            "url": %SEO_PUBLIC_SITE_URL_JSON%,
+            "logo": %SEO_PUBLIC_IMAGE_URL_JSON%,
+            "description": "Open-source AI journaling and reflective writing application."
+          },
+          {
+            "@type": "WebSite",
+            "name": "Ink & Memory",
+            "url": %SEO_PUBLIC_SITE_URL_JSON%,
+            "description": "A bilingual AI journaling studio for reflective writing and personal pattern discovery.",
+            "inLanguage": ["en", "zh-CN"]
+          },
+          {
+            "@type": "WebApplication",
+            "name": "Ink & Memory",
+            "url": %SEO_PUBLIC_SITE_URL_JSON%,
+            "applicationCategory": "LifestyleApplication",
+            "operatingSystem": "Any modern web browser",
+            "browserRequirements": "Requires JavaScript and a modern browser.",
+            "description": "Ink & Memory helps writers keep autosaved journal sessions, receive AI inner voice feedback, customize voice decks, generate visual memory timelines, and analyze recurring personal patterns.",
+            "featureList": [
+              "Bilingual English and Chinese journaling",
+              "AI inner voice feedback for reflective writing",
+              "Customizable voice decks and prompts",
+              "Autosaved writing sessions",
+              "Visual memory timelines",
+              "Reflections analysis for echoes, traits, and patterns"
+            ],
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD"
+            }
+          }
+        ]
+      }
+    </script>
 
     <!-- Preload critical fonts to prevent FOIT (Flash of Invisible Text) -->
-    <link rel="preload" href="/Excalifont-Regular.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="preload" href="/Xiaolai-Regular.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="%BASE_URL%Excalifont-Regular.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="%BASE_URL%Xiaolai-Regular.woff2" as="font" type="font/woff2" crossorigin />
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <main aria-label="Ink & Memory overview">
+        <h1>Ink & Memory</h1>
+        <p>
+          Ink & Memory is a bilingual AI journaling studio for people who want
+          a calmer way to write, reflect, and notice recurring patterns in their
+          own thoughts. The app combines autosaved writing sessions, AI inner
+          voice feedback, customizable voice decks, visual memory timelines, and
+          Reflections analysis for echoes, traits, and patterns.
+        </p>
+        <h2>AI Journaling For Reflective Writing</h2>
+        <p>
+          Writers use Ink & Memory to capture daily notes in English or Chinese,
+          invite distinct AI perspectives into the writing margin, and return to
+          previous sessions through a personal timeline. Each voice is editable
+          as a prompt, icon, and color, so the journal can become a practical
+          thinking companion rather than a generic notes app.
+        </p>
+        <h2>中文简介</h2>
+        <p>
+          Ink & Memory 是一个中英文双语 AI 日记工作室，帮助用户保存写作、
+          倾听不同内心声音的反馈，并通过时间线和反思分析发现自己的长期模式。
+        </p>
+      </main>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
